@@ -1,0 +1,2853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drag Race Simulator - Custom Edition</title>
+    <style>
+        :root {
+            --bg-color: #121214;
+            --panel-bg: #1a1a1e;
+            --accent-pink: #ff007f;
+            --accent-purple: #7928ca;
+            --text-main: #f0f0f3;
+            --text-muted: #a0a0ab;
+            --border-color: #2e2e38;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .container { width: 100%; max-width: 900px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 25px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); }
+        h1 { text-align: center; font-size: 2rem; background: linear-gradient(45deg, var(--accent-pink), #ffb800); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 20px; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-muted); }
+        textarea, select { width: 100%; background: #121214; border: 1px solid var(--border-color); color: #fff; padding: 12px; border-radius: 8px; font-size: 1rem; margin-bottom: 20px; }
+        textarea { height: 150px; resize: vertical; }
+        .btn { background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple)); color: white; border: none; padding: 12px 24px; font-size: 1rem; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .btn-group { display: flex; gap: 10px; margin-bottom: 15px; }
+        .btn-secondary { background: #2e2e38; flex: 1; padding: 8px; font-size: 0.9rem; }
+
+        .stage-box { background: #121214; border: 1px solid var(--border-color); border-radius: 8px; padding: 20px; margin-bottom: 20px; min-height: 200px; display: flex; flex-direction: column; justify-content: center; text-align: center; }
+        .stage-title { font-size: 1.3rem; color: #ffb800; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1px; }
+        .stage-text { font-size: 1.1rem; line-height: 1.6; margin-bottom: 15px; }
+        .cast-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px; }
+        .mini-badge { background: #2e2e38; padding: 6px 12px; border-radius: 20px; font-size: 0.85rem; border: 1px solid #444; }
+
+        /* Slow animated reveals */
+        .reveal-line { opacity: 0; transform: translateY(10px); transition: opacity 1.3s ease, transform 1.3s ease; margin-bottom: 10px; }
+        .reveal-line.show { opacity: 1; transform: none; }
+        .reveal-line.dots { font-size: 2rem; letter-spacing: 6px; color: var(--text-muted); }
+        .reveal-line.stay { color: #00d2ff; font-size: 1.5rem; font-weight: bold; }
+        .reveal-line.sashay { color: #ff4444; font-size: 1.5rem; font-weight: bold; text-shadow: 0 0 14px rgba(255,0,0,0.6); }
+        .reveal-line.high { color: #87cefa; }
+        .reveal-line.low { color: #ffb6c1; }
+        .reveal-line.bottom { color: #ff6b6b; font-weight: bold; }
+        .reveal-line.win { color: #00d2ff; font-weight: bold; font-size: 1.25rem; }
+        .reveal-line.rel { color: #ff8ad8; font-style: italic; }
+        .reveal-line.winner-line { color: #ffd700; font-size: 1.7rem; font-weight: bold; text-shadow: 0 0 18px rgba(255,215,0,0.7); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+        .table-container { overflow-x: auto; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; text-align: center; font-size: 0.8rem; }
+        th, td { border: 1px solid #999; padding: 6px 4px; min-width: 52px; }
+        th { background: #e9dde9; color: #222; }
+        td.name-col { text-align: center; padding: 6px 8px; font-weight: bold; background: #f5eaf5; color: #000; }
+        td.rank-col { background: #f5eaf5; color: #000; font-weight: bold; }
+        td.ppe-col { background: #d3d3d3; color: #000; font-weight: bold; }
+        td i.mc { display: block; font-size: 0.7em; font-weight: normal; }
+
+        .badge-WIN, .badge-TOP2 { background-color: #00bfff; color: #000; font-weight: bold; }
+        .badge-HIGH { background-color: #add8e6; color: #000; }
+        .badge-SAFE { background-color: #ffffff; color: #000; }
+        .badge-LOW { background-color: #ffb6c1; color: #000; }
+        .badge-BTM2, .badge-BTM3 { background-color: #ff6347; color: #000; }
+        .badge-ELIM { background-color: #ff0000; color: #000; font-weight: bold; }
+        .badge-WINNER { background-color: #ffff00; color: #000; font-weight: bold; }
+        .badge-RUNNER-UP { background-color: #ffd700; color: #000; font-weight: bold; }
+        .badge-FINALIST { background-color: #ffa500; color: #000; font-weight: bold; }
+        .badge-OUT { background-color: #808080; color: #fff; }
+        .badge-BLOCKED { background-color: #9b30ff; color: #fff; font-weight: bold; }
+        .badge-WINLS { background-color: #4169e1; color: #fff; font-weight: bold; }
+        .badge-BLOCKRED { background-color: #ff0000; color: #000; font-weight: bold; }
+        .badge-HIGHBLOCK { background-color: #d97070; color: #000; }
+        .badge-LOST1 { background-color: #ff7f00; color: #000; font-weight: bold; }
+        .badge-L2WIN { background-color: #c5e0b3; color: #000; font-weight: bold; }
+        .badge-L2A { background-color: #a9d08e; color: #000; font-weight: bold; }
+        .badge-L2B { background-color: #8fb673; color: #000; font-weight: bold; }
+        .badge-L2C { background-color: #729a5a; color: #000; font-weight: bold; }
+        .badge-L2E { background-color: #a0522d; color: #fff; font-weight: bold; }
+
+        .rel-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 20px; }
+        .rel-card { background: #121214; border: 2px solid var(--accent-pink); border-radius: 10px; padding: 8px; width: 165px; text-align: center; }
+        .rel-card .rel-name { font-weight: bold; font-size: 0.9rem; margin-bottom: 6px; word-break: break-word; }
+        .rel-card .chk { font-size: 0.8rem; margin: 0 0 4px 0; justify-content: flex-start; }
+        .chk { display: flex; gap: 8px; align-items: center; font-weight: normal; color: var(--text-main); margin: 0; cursor: pointer; }
+        .chk input { width: auto; margin: 0; }
+        .edition-item { display: flex; align-items: center; gap: 8px; background: #121214; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 0.9rem; }
+        .edition-item .info { flex: 1; }
+        .edition-item .info small { color: var(--text-muted); display: block; }
+        .edition-item button { width: auto; padding: 6px 12px; flex: none; }
+        .as-panel { background: #121214; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+        .as-panel summary { cursor: pointer; font-weight: 700; color: var(--accent-pink); }
+        .as-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 6px; color: #ffb800; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; }
+        .as-divider::before, .as-divider::after { content: ''; flex: 1; border-top: 2px solid var(--accent-pink); }
+        .as-season { color: var(--text-muted); font-size: 0.85rem; margin: 8px 0 4px; }
+        .as-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; border-bottom: 1px solid #26262d; font-size: 0.9rem; }
+        .as-row .nm { flex: 1; font-weight: 600; color: var(--text-main); }
+        .as-row .pl { color: var(--text-muted); font-size: 0.8rem; text-align: right; }
+        .as-row input { width: auto; margin: 0; }
+        #sim-track-title { cursor: pointer; user-select: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Drag Race Simulator</h1>
+
+    <!-- SETUP SCREEN -->
+    <div id="setup-screen" class="screen active">
+        <label for="set-select">Show / Set (saved editions are added to this set):</label>
+        <div class="btn-group">
+            <select id="set-select" style="margin-bottom:0; flex:1;" onchange="renderEditions()"></select>
+            <button class="btn btn-secondary" style="flex:none; width:auto;" onclick="newSet()">➕ New Set</button>
+            <button class="btn btn-secondary" style="flex:none; width:auto;" onclick="deleteSet()">🗑 Delete</button>
+        </div>
+        <div class="btn-group">
+            <button class="btn btn-secondary" onclick="saveCastToSet()">Save cast to set</button>
+            <button class="btn btn-secondary" onclick="loadSetCast()">Load set cast</button>
+        </div>
+
+        <details class="as-panel" id="as-panel" ontoggle="if(this.open) renderAllStarsPicker()">
+            <summary>⭐ All Stars Cast Builder (queens from all your saved shows)</summary>
+            <div style="margin-top:10px; color:var(--text-muted); font-size:0.85rem;">Every saved show is listed below with a divider. Each queen shows how she placed in that season. Tick the queens you want, then add them to the cast.</div>
+            <div id="as-list"></div>
+            <div class="btn-group" style="margin-top:12px;">
+                <button class="btn btn-secondary" onclick="addAllStarsToCast(false)">Add ticked queens to cast</button>
+                <button class="btn btn-secondary" onclick="addAllStarsToCast(true)">Replace cast with ticked</button>
+            </div>
+            <div id="as-status" style="color:var(--text-muted); font-size:0.85rem;"></div>
+        </details>
+
+        <label for="cast-input">Enter Contestants (one per line):</label>
+        <textarea id="cast-input" placeholder="Type one contestant name per line (at least 4)..."></textarea>
+
+        <label for="format-select">Select Competition Format:</label>
+        <select id="format-select">
+            <option value="normal">Standard (Bottom 2 Lip Sync)</option>
+            <option value="legacy">All Stars: Lip Sync For Your Legacy (Top 2 choose lipstick)</option>
+            <option value="strategy">Strategy Format (Winner picks 1 bottom, picked queen picks opponent)</option>
+            <option value="dangerous">Dangerous Format (Top 2 can eliminate any safe queen, no bottom)</option>
+            <option value="assassin">All Stars: Lip Sync Assassin (Winner lip syncs a returning alum)</option>
+            <option value="stars">All Stars: Stars &amp; Badges (Non-elimination, star count picks the finalists)</option>
+            <option value="teams">All Stars: Teams / Pairs (Teams judged together, losing team goes home)</option>
+            <option value="bracket">All Stars: Bracket Tournament (3 brackets, points, then merge)</option>
+        </select>
+
+        <details class="as-panel" id="as-formats-panel">
+            <summary>📖 All Stars Competition Formats (reference)</summary>
+            <div style="margin-top:10px; color:var(--text-muted); font-size:0.85rem; line-height:1.5;">
+                <p style="margin-bottom:10px;">RuPaul’s Drag Race All Stars has used five primary competition formats across its 11 seasons, alongside a few international variants.</p>
+
+                <div class="as-divider">Flagship US Formats</div>
+
+                <div class="as-season"><b style="color:var(--text-main);">Teams / Pairs (AS1)</b></div>
+                <ul style="margin:0 0 8px 20px;">
+                    <li><b>Core Mechanic:</b> Queens form pairs at the start of the season and are judged together.</li>
+                    <li><b>Eliminations:</b> The bottom two teams each send one partner to lip-sync (with a “She-mergency” button allowing the other partner to tag in); both partners are eliminated together.</li>
+                    <li><b>Twists:</b> Teams were only disbanded at the Top 4 finale.</li>
+                </ul>
+
+                <div class="as-season"><b style="color:var(--text-main);">Lip Sync for Your Legacy (AS2, AS3, AS4)</b></div>
+                <ul style="margin:0 0 8px 20px;">
+                    <li><b>Core Mechanic:</b> The top two queens of the week lip-sync against each other for a cash tip.</li>
+                    <li><b>Eliminations:</b> The lip-sync winner pulls a lipstick to eliminate one of the bottom queens.</li>
+                    <li><b>Twists:</b> AS2 featured Revenge of the Queens (eliminated queens returned to win a spot back), and AS3 introduced a Jury of Queers (eliminated queens voted on the Top 2 finalists).</li>
+                </ul>
+
+                <div class="as-season"><b style="color:var(--text-main);">Lip Sync Assassin (AS5, AS6, AS8)</b></div>
+                <ul style="margin:0 0 8px 20px;">
+                    <li><b>Core Mechanic:</b> A single weekly challenge winner lip-syncs against a surprise returning franchise alum (the “Assassin”).</li>
+                    <li><b>Eliminations:</b> If the All-Star wins, she eliminates her chosen bottom queen; if the Assassin wins, a secret group vote by the remaining queens decides who goes home.</li>
+                    <li><b>Twists:</b> AS6 introduced the Game Within a Game (a secret lip-sync tournament among eliminated queens for a spot back), while AS8 featured the Fame Games (a fan-voted runway prize for eliminated queens).</li>
+                </ul>
+
+                <div class="as-season"><b style="color:var(--text-main);">Non-Elimination / Stars &amp; Badges (AS7, AS9)</b></div>
+                <ul style="margin:0 0 8px 20px;">
+                    <li><b>Core Mechanic:</b> Nobody goes home; the top two queens earn a Star (AS7) or Benefactress Badge (AS9) and lip-sync for the power to “block” a rival from earning one the following week.</li>
+                    <li><b>Advancement:</b> The queens with the most Stars/Badges at the end of the season advance to a finale Lip Sync Smackdown.</li>
+                    <li><b>Twists:</b> Used for an all-winners cast (AS7) and a charity season (AS9), featuring late-season double/triple star episodes to let trailing queens catch up.</li>
+                </ul>
+
+                <div class="as-season"><b style="color:var(--text-main);">Bracket Tournament (AS10, AS11)</b></div>
+                <ul style="margin:0 0 8px 20px;">
+                    <li><b>Core Mechanic:</b> An 18-queen cast is split into three separate brackets of six queens competing in three-episode mini-seasons.</li>
+                    <li><b>Advancement:</b> Queens accumulate points from challenge wins and peer-gifted points; top scorers from each bracket (top 3 in AS10; top 2 in AS11) merge into the semi-finals.</li>
+                    <li><b>Eliminations &amp; Finale:</b> Merged episodes revert to traditional Lip Sync for Your Life eliminations (plus a judges’ Wild Card returnee) leading into a finale Lip Sync Smackdown.</li>
+                </ul>
+
+                <div class="as-divider">International All Stars Variants</div>
+            </div>
+        </details>
+
+        <label for="finale-size">Finale size:</label>
+        <select id="finale-size">
+            <option value="3">Top 3</option>
+            <option value="4">Top 4</option>
+            <option value="5">Top 5</option>
+        </select>
+
+        <label for="lala-mode">LaLaPaRuZa Lip Sync Smackdown maxi challenge:</label>
+        <select id="lala-mode">
+            <option value="sometimes">Once per season, when 6 queens remain (never the premiere)</option>
+            <option value="off">Off</option>
+        </select>
+
+        <label for="premiere-type">Premiere:</label>
+        <select id="premiere-type">
+            <option value="elim">Standard premiere (someone goes home)</option>
+            <option value="nonelim">Non-elimination premiere</option>
+        </select>
+
+        <label>Twists:</label>
+        <div style="margin-bottom:20px; display:flex; flex-direction:column; gap:10px;">
+            <div>
+                <label for="coin-mode" style="margin-bottom:6px;">🪙 Lucky coin twist (Heads &amp; Tails, uses the bottom three):</label>
+                <select id="coin-mode" style="margin-bottom:0;">
+                    <option value="off">Off</option>
+                    <option value="premiere">Premiere only</option>
+                    <option value="random">Premiere + random later episodes</option>
+                    <option value="every">Every episode</option>
+                </select>
+            </div>
+            <label class="chk"><input type="checkbox" id="opt-alliance" checked> 🤝 Alliance power: a challenge winner can save an ally who is at risk</label>
+            <label class="chk"><input type="checkbox" id="opt-dshantay"> Allow double shantay (both bottom queens stay)</label>
+            <label class="chk"><input type="checkbox" id="opt-dsashay"> Allow double sashay (both bottom queens go home)</label>
+            <label class="chk"><input type="checkbox" id="opt-threeway" checked> Sometimes a three-way bottom (standard and All Stars lipstick formats)</label>
+        </div>
+
+        <button class="btn" onclick="startSimulator()">Start Simulation!</button>
+
+        <div id="backup-panel" style="margin-top:25px;">
+            <label>🗄️ Backup (all shows, queens &amp; saved editions)</label>
+            <div style="display:flex; gap:8px;">
+                <button class="btn btn-secondary" style="flex:1;" onclick="exportBackup()">⬇ Export backup</button>
+                <button class="btn btn-secondary" style="flex:1;" onclick="document.getElementById('backup-file').click()">⬆ Import backup</button>
+                <input type="file" id="backup-file" accept=".json,application/json" style="display:none;" onchange="importBackup(this)">
+            </div>
+            <div id="backup-status" style="color:var(--text-muted); font-size:0.85rem; margin-top:6px;"></div>
+        </div>
+
+        <div id="editions-panel" style="margin-top:25px; display:none;">
+            <label id="editions-label">💾 Saved Editions</label>
+            <div id="editions-list"></div>
+        </div>
+    </div>
+
+    <!-- RELATIONSHIP SETUP SCREEN -->
+    <div id="rel-screen" class="screen">
+        <div class="stage-box" style="min-height:0; padding:15px;">
+            <div class="stage-title" style="margin-bottom:4px;">Meet the cast!</div>
+            <div style="color:var(--text-muted);">Relationships</div>
+        </div>
+        <label for="rel-select">Contestant:</label>
+        <select id="rel-select" onchange="renderRelGrid()"></select>
+        <label>Set the contestant's relationships...</label>
+        <div id="rel-grid" class="rel-grid"></div>
+        <div id="team-panel" style="display:none; margin-bottom:15px;"></div>
+        <div class="btn-group">
+            <button class="btn btn-secondary" onclick="randomizeRels()">Randomize All</button>
+            <button class="btn btn-secondary" onclick="resetRels()">Reset All</button>
+            <button class="btn btn-secondary" onclick="backToSetup()">← Back</button>
+        </div>
+        <button class="btn" onclick="proceedFromRelationships()">Proceed</button>
+    </div>
+
+    <!-- SIMULATION SCREEN -->
+    <div id="sim-screen" class="screen">
+        <div id="episode-header" style="font-size: 1.1rem; color: var(--accent-pink); margin-bottom: 10px; font-weight: bold;"></div>
+
+        <div class="stage-box">
+            <div id="stage-title" class="stage-title">Workroom</div>
+            <div id="stage-text" class="stage-text">The queens enter the workroom...</div>
+            <div id="stage-extras" class="cast-grid"></div>
+        </div>
+
+        <button id="skip-btn" class="btn btn-secondary" style="display:none; width:100%; margin-bottom:10px;" onclick="skipReveal()">⏩ Skip animation</button>
+        <button id="next-btn" class="btn" style="margin-bottom:20px;" onclick="nextPhase()">Proceed</button>
+
+        <div id="sim-track" style="display:none; margin-bottom:20px;">
+            <div id="sim-track-title" style="font-weight:bold; color: var(--accent-pink); margin-bottom:8px;" onclick="toggleTrack()">▶ Track Record So Far</div>
+            <div id="sim-track-body">
+            <div class="table-container" style="margin-top:0;">
+                <table><thead id="sim-head"></thead><tbody id="sim-body"></tbody></table>
+            </div>
+            <button class="btn btn-secondary" style="width:100%; margin-top:10px;" onclick="savePNG(false)">📷 Save Track Record as PNG</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- RESULTS / TRACK RECORD SCREEN -->
+    <div id="results-screen" class="screen">
+        <div class="stage-box">
+            <div class="stage-title">Season Results & Track Records</div>
+            <div id="winner-announcement" style="font-size: 1.2rem; margin-bottom: 15px; color: #ffd700; font-weight: bold;"></div>
+        </div>
+        <div class="table-container">
+            <table id="track-record-table">
+                <thead id="table-head"></thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+        <div class="btn-group" style="margin-top: 20px;">
+            <button id="save-edition-btn" class="btn btn-secondary" onclick="saveEdition()">💾 Save Edition</button>
+            <button class="btn btn-secondary" onclick="savePNG(true)">📷 Save Track Record as PNG</button>
+        </div>
+        <div id="save-status" style="text-align:center; color:#00d2ff; min-height:20px; margin-bottom:10px; font-size:0.9rem;"></div>
+        <button class="btn" onclick="location.reload()">Run New Simulation</button>
+    </div>
+</div>
+
+<script>
+/* ============================================================
+   STATE
+   ============================================================ */
+let contestants = [];
+let allCast = [];
+let eliminatedQueens = [];
+let seasonHistory = [];
+let rels = [];            // relationships between queens
+let currentEpisode = 0;
+let totalEpisodes = 0;
+let currentPhaseIndex = 0;
+let formatType = 'normal';
+let starCount = {}, blockedQueen = null, starEps = 0, starTallyDone = false;
+let dblStarEp = 0, starsCells2 = {};
+let teamPairs = [], brBrackets = [], brPts = {}, brWild = false, brAdv = 0, usedAssassins = [];
+let epData = {};
+let epPhases = [];
+let inFinale = false;
+let finale = {};
+let finalState = null;    // state used by the results screen / final PNG
+let opts = { alliancePower: true, lalaMode: 'sometimes', coinMode: 'off', doubleShantay: false, doubleSashay: false, nonElimPremiere: false, threeWay: true, finaleSize: 3 };
+
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuf = a => [...a].sort(() => Math.random() - 0.5);
+const finalCount = () => opts.finaleSize || 3;
+
+function startSimulator() {
+    const raw = document.getElementById('cast-input').value.trim();
+    if (!raw) return alert("Please enter at least 4 contestants.");
+    const list = [...new Set(raw.split('\n').map(c => c.replace(/[<>&"]/g, '').trim()).filter(c => c.length > 0))];
+    opts = {
+        coinMode: document.getElementById('coin-mode').value,
+        lalaMode: document.getElementById('lala-mode').value,
+        alliancePower: document.getElementById('opt-alliance').checked,
+        doubleShantay: document.getElementById('opt-dshantay').checked,
+        doubleSashay: document.getElementById('opt-dsashay').checked,
+        threeWay: document.getElementById('opt-threeway').checked,
+        nonElimPremiere: document.getElementById('premiere-type').value === 'nonelim',
+        finaleSize: parseInt(document.getElementById('finale-size').value, 10)
+    };
+    if (list.length <= opts.finaleSize) return alert(`You need at least ${opts.finaleSize + 1} different contestants for a Top ${opts.finaleSize} finale.`);
+    contestants = list;
+
+    formatType = document.getElementById('format-select').value;
+    if (formatType === 'teams') {
+        if (list.length % 2 !== 0 || list.length < 6) return alert("Teams / Pairs needs an even number of queens (at least 6).");
+        opts.finaleSize = 4;   // teams are only split at the Top 4 finale
+    }
+    if (formatType === 'stars') {
+        if (list.length < 5) return alert("Stars & Badges needs at least 5 queens (Top 4 finale).");
+        opts.finaleSize = 4;
+    }
+    if (formatType === 'bracket' && list.length < 9) return alert("The Bracket Tournament needs at least 9 queens (3 brackets of 3 or more).");
+    if (formatType === 'assassin' && !savedQueenPool(list).length) return alert("Lip Sync Assassin needs returning queens from your saved editions. Finish a season and use \"Save Edition\" first, then try again.");
+    allCast = [...contestants];
+    eliminatedQueens = [];
+    seasonHistory = [];
+    inFinale = false;
+    finale = {};
+    currentEpisode = 1;
+    totalEpisodes = Math.max(1, contestants.length - finalCount());
+    planDoubles();
+    starCount = {}; blockedQueen = null; starTallyDone = false; usedAssassins = [];
+    teamPairs = formatType === 'teams' ? genTeams(allCast) : [];
+    brBrackets = []; brPts = {}; brWild = false; brAdv = 0;
+    if (formatType === 'bracket') {
+        brBrackets = [[], [], []];
+        shuf(allCast).forEach((q, i) => brBrackets[i % 3].push(q));
+        brAdv = Math.min(...brBrackets.map(b => b.length)) >= 5 ? 3 : 2;
+        allCast.forEach(q => { brPts[q] = 0; });
+        const mergedEps = Math.max(1, brAdv * 3 + 1 - finalCount());
+        const budget = Math.max(3, 9 - mergedEps);
+        brSched = [];
+        brBrackets.forEach((b, bi) => {
+            const n = Math.floor(budget / 3) + (bi < budget % 3 ? 1 : 0);
+            for (let k = 1; k <= n; k++) brSched.push({ bi, k, n });
+        });
+    }
+    teamPad = [];
+    if (formatType === 'teams') {
+        const padN = Math.max(0, 9 - (allCast.length / 2 - 2));
+        const eps = []; for (let e = 1; e <= 8; e++) eps.push(e);
+        teamPad = shuf(eps).slice(0, padN);
+    }
+    starEps = 9;
+    dblStarEp = starEps >= 4 ? 2 + Math.floor(Math.random() * (starEps - 2)) : 0;
+    starsCells2 = {};
+    rels = genRelationships(allCast);
+
+    document.getElementById('setup-screen').classList.remove('active');
+    showRelScreen();
+}
+
+/* ---------- relationship setup screen ---------- */
+const REL_LABEL = { 'besties': 'Besties', 'rivals': 'Rivals', 'allies': 'Allies', 'frenemies': 'Frenemies', 'drag sisters': 'Drag sisters', 'former friends': 'Former friends' };
+
+function showRelScreen() {
+    const sel = document.getElementById('rel-select');
+    sel.innerHTML = '';
+    allCast.forEach(q => {
+        const o = document.createElement('option');
+        o.value = q; o.textContent = q;
+        sel.appendChild(o);
+    });
+    sel.value = allCast[0];
+    document.getElementById('rel-screen').classList.add('active');
+    renderRelGrid();
+    renderTeamPanel();
+}
+function renderRelGrid() {
+    const me = document.getElementById('rel-select').value;
+    const grid = document.getElementById('rel-grid');
+    grid.innerHTML = '';
+    allCast.filter(q => q !== me).forEach(q => {
+        const card = document.createElement('div');
+        card.className = 'rel-card';
+        const nm = document.createElement('div');
+        nm.className = 'rel-name';
+        nm.textContent = q;
+        const r = relOf(me, q);
+        const cur = r ? r.type : 'neutral';
+        card.appendChild(nm);
+        if (pastInfo[q]) { const pi = document.createElement('div'); pi.style.cssText = 'font-size:0.7rem;color:var(--text-muted);margin:-2px 0 6px;'; pi.textContent = pastInfo[q]; card.appendChild(pi); }
+        REL_TYPES.forEach(t => {
+            const lab = document.createElement('label');
+            lab.className = 'chk';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = cur === t;
+            cb.onchange = () => { setRelPair(me, q, cb.checked ? t : 'neutral'); renderRelGrid(); };
+            lab.appendChild(cb);
+            lab.appendChild(document.createTextNode(' ' + REL_LABEL[t]));
+            card.appendChild(lab);
+        });
+        grid.appendChild(card);
+    });
+}
+function setRelPair(a, b, type) {
+    rels = rels.filter(r => !((r.a === a && r.b === b) || (r.a === b && r.b === a)));
+    if (type !== 'neutral') rels.push({ a, b, type });
+}
+function randomizeRels() { rels = genRelationships(allCast); renderRelGrid(); }
+function resetRels() { rels = []; renderRelGrid(); }
+function backToSetup() {
+    document.getElementById('rel-screen').classList.remove('active');
+    document.getElementById('setup-screen').classList.add('active');
+}
+function proceedFromRelationships() {
+    document.getElementById('rel-screen').classList.remove('active');
+    document.getElementById('sim-screen').classList.add('active');
+    setupEpisode();
+}
+
+/* ============================================================
+   CONTENT POOLS
+   ============================================================ */
+const maxiChallenges = [
+    { name: "Snatch Game", desc: "Each queen picks a celebrity and plays their very best impression in the game show." },
+    { name: "The Rusical", desc: "The queens star in an original musical, singing, dancing and acting their hearts out." },
+    { name: "The Ball", desc: "Three runway categories, three looks, and every one has to be a showstopper." },
+    { name: "Girl Groups Original Song", desc: "Teams write lyrics, record vocals and perform an original song and choreography." },
+    { name: "Design Challenge: Trash to Treasure", desc: "Using only recycled junk, the queens must build a couture runway look." },
+    { name: "Improv Comedy Troupe", desc: "Teams are thrown into live improv scenes and must keep the laughs going." },
+    { name: "Stand-Up Comedy Roast", desc: "Each queen writes and delivers a roast, and the room is not safe." },
+    { name: "Makeover Challenge", desc: "The queens transform a special guest, then walk the runway beside them." },
+    { name: "Drag Movie Shequels", desc: "Teams act in the parody sequel of a hit film, with plenty of camp." },
+    { name: "Revenge of the Queens", desc: "A horror-comedy where the queens scream, slay and try to survive." },
+    { name: "Drag Fish Tank", desc: "The queens pitch and perform a drag business idea to the sharks." },
+    { name: "Queens of Clubs", desc: "Each queen creates a nightclub concept and performs a number for it." },
+    { name: "RuPaul's Big Opening", desc: "The queens write and perform a big group opening number for a variety show." },
+    { name: "Music Video Challenge", desc: "The queens shoot a music video, acting, dancing and lip syncing on camera." },
+    { name: "Talk Show Challenge", desc: "The queens host and guest on a talk show with a celebrity panel." },
+    { name: "Sitcom Acting Challenge", desc: "A classic sitcom script, a studio audience, and comic timing is everything." },
+    { name: "Soap Opera Challenge", desc: "Over-the-top drama, big feelings and plenty of dramatic gasps." },
+    { name: "Commercial Challenge", desc: "Teams sell a product on camera with jingles, slogans and charm." },
+    { name: "Choreography Challenge", desc: "The queens learn a dance routine and perform it with full attitude." },
+    { name: "Talent Show", desc: "Every queen shows off a talent: singing, dancing, comedy, or something unexpected." },
+    { name: "Variety Show", desc: "Singing, sketches and dancing combine in a night of full-on entertainment." },
+    { name: "Sketch Comedy Show", desc: "The queens perform written sketches playing multiple characters." },
+    { name: "Pop Star Parody", desc: "Each queen turns into a pop diva and performs a parody of a hit song." },
+    { name: "Drag Dating Game", desc: "The queens play a dating game show, trading flirtation and shade." },
+    { name: "Real Housequeens", desc: "A reality TV parody with fights, table flips and dramatic confessionals." },
+    { name: "Ad Campaign Photoshoot", desc: "The queens model for a campaign and must sell the product with one frame." },
+    { name: "Magazine Cover Photoshoot", desc: "The queens give high fashion on set with a pro photographer." },
+    { name: "Fake Movie Trailer", desc: "The queens star in the trailer for a blockbuster that does not exist." },
+    { name: "Late Night Show", desc: "Hosting a late night show with monologues, interviews and a live band." },
+    { name: "Courtroom Drama", desc: "The queens take sides in a dramatic trial full of big accusations." },
+    { name: "Drag Pageant", desc: "Evening gown, talent and an interview: the queens compete in a pageant." },
+    { name: "Drag Olympics", desc: "The queens compete in outrageous sports, with style points for flair." },
+    { name: "Bridal Ball", desc: "The queens design and present a wedding look worthy of the aisle." },
+    { name: "Puppet Show", desc: "The queens craft puppets and perform a short musical with them." },
+    { name: "Cabaret Night", desc: "The queens deliver live musical numbers to a glamorous cabaret crowd." },
+    { name: "Fashion Show Design Challenge", desc: "The queens design looks for their own mini runway collection." },
+    { name: "Reading Is Fundamental", desc: "The ultimate reading challenge: write the best read for every queen in the room." },
+    { name: "Roast of the Judges", desc: "The queens roast the judges themselves, and nobody is safe." },
+    { name: "Comedy Game Show", desc: "The queens compete in a high-energy game show with wild buzzers." },
+    { name: "Drag Race Eleganza Extravaganza", desc: "The queens present couture inspired by a surprise theme." },
+    { name: "Action Movie Parody", desc: "The queens star in a fast-paced action parody full of explosions and stunts." }
+];
+let usedChallenges = [];
+function nextChallenge() {
+    let pool = maxiChallenges.filter(c => !usedChallenges.includes(c.name));
+    if (!pool.length) { usedChallenges = []; pool = maxiChallenges; }
+    const c = pick(pool);
+    usedChallenges.push(c.name);
+    return c;
+}
+let forcedNeed = 0, midNonElimQueue = [], teamPad = [], brSched = [];
+let doublePlan = [], doubleCount = 0, lalaDone = false, midNonElimEp = 0, midNonElimDone = false, seasonMoments = [], afterReveal = null;
+function planDoubles() {
+    doubleCount = 0; lalaDone = false; usedChallenges = [];
+    const kinds = [opts.doubleShantay, opts.doubleSashay].filter(Boolean).length;
+    const slots = [];
+    if (kinds) {
+        const maxEp = Math.max(1, opts.doubleSashay && !opts.doubleShantay ? totalEpisodes - 1 : totalEpisodes);
+        for (let e = (opts.nonElimPremiere ? 2 : 1); e <= maxEp; e++) slots.push(e);
+    }
+    const n = Math.random() < 0.5 ? 1 : 2;   // each season: at least 1, at most 2 double events
+    doublePlan = shuf(slots).slice(0, n);
+    // at most one random non-elimination episode in the middle of the season
+    seasonMoments = []; midNonElimDone = false; midNonElimEp = 0;
+    const mids = [];
+    for (let e = 3; e <= totalEpisodes - 2; e++) if (!doublePlan.includes(e)) mids.push(e);
+    forcedNeed = 0; midNonElimQueue = [];
+    midNonElimEp = 0;   // season length is steered by the 10-episode controller in setupEpisode
+}
+function decideElimMode(nonElim) {
+    if (nonElim) return 'noelim';
+    if (forcedNeed > 0 && doublePlan.includes(currentEpisode) && contestants.length - 2 >= finalCount()) { doubleCount++; return 'sashay2'; }
+    if (formatType === 'legacy') return 'single';   // lipstick format: only the queen the winner chooses can go home
+    const kinds = [];
+    if (opts.doubleShantay) kinds.push('shantay2');
+    if (opts.doubleSashay && contestants.length - 2 >= finalCount() && !(opts.lalaMode === 'sometimes' && !lalaDone && contestants.length === 7)) kinds.push('sashay2');
+    if (!kinds.length || doubleCount >= Math.max(2, forcedNeed)) return 'single';
+    const left = contestants.length - finalCount();
+    if (doublePlan.includes(currentEpisode) || (doubleCount === 0 && left <= 2)) { doubleCount++; return pick(kinds); }
+    return 'single';
+}
+
+const lalaChallenge = { name: "LaLaPaRuZa Lip Sync Smackdown", type: "lalaparuza" };
+
+const lipSyncSongs = [
+    "Really Don't Care by Demi Lovato",
+    "Break Free by Ariana Grande",
+    "Physical by Dua Lipa",
+    "Bad Romance by Lady Gaga",
+    "Telepatía by Kali Uchis",
+    "Super Freaky Girl by Nicki Minaj"
+];
+
+const REL_ICON = { 'besties': '💖', 'rivals': '⚔️', 'allies': '🤝', 'frenemies': '🎭', 'drag sisters': '👯', 'former friends': '💔' };
+const REL_TYPES = ['besties', 'rivals', 'allies', 'frenemies', 'drag sisters', 'former friends'];
+
+/* ============================================================
+   RELATIONSHIPS
+   ============================================================ */
+function genRelationships(cast) {
+    const s = shuf(cast);
+    const list = [];
+    const has = (a, b) => list.some(r => (r.a === a && r.b === b) || (r.a === b && r.b === a));
+    for (let i = 0; i + 1 < s.length; i += 2) list.push({ a: s[i], b: s[i + 1], type: pick(REL_TYPES) });
+    let extra = Math.max(2, Math.floor(cast.length / 3));
+    let tries = 0;
+    while (extra > 0 && tries < 60) {
+        tries++;
+        const [a, b] = shuf(cast).slice(0, 2);
+        if (!has(a, b)) { list.push({ a, b, type: pick(REL_TYPES) }); extra--; }
+    }
+    return list;
+}
+function activeRels(type) {
+    return rels.filter(r => (!type || r.type === type) && contestants.includes(r.a) && contestants.includes(r.b));
+}
+function relPair(type) {
+    const r = pick(activeRels(type).length ? activeRels(type) : [null]);
+    if (!r) return null;
+    return Math.random() < 0.5 ? [r.a, r.b, r] : [r.b, r.a, r];
+}
+function relOf(a, b) {
+    return rels.find(r => (r.a === a && r.b === b) || (r.a === b && r.b === a));
+}
+function setRel(a, b, type) {
+    const r = relOf(a, b);
+    if (r) r.type = type; else rels.push({ a, b, type });
+}
+function unrelatedPair() {
+    for (let i = 0; i < 30; i++) {
+        const [a, b] = shuf(contestants).slice(0, 2);
+        if (a && b && !relOf(a, b)) return [a, b];
+    }
+    return null;
+}
+function maybeRelChange() {
+    const opts = [];
+    const bs = relPair('besties');
+    if (bs) opts.push(() => { setRel(bs[0], bs[1], 'frenemies'); return `💔 ${bs[0]} was overheard criticizing ${bs[1]} behind their back. The friendship cracks — they are now <b>frenemies</b>.`; });
+    const rv = relPair('rivals');
+    if (rv) opts.push(() => { setRel(rv[0], rv[1], 'frenemies'); return `🕊️ ${rv[0]} and ${rv[1]} finally clear the air after a heated talk. They are now <b>frenemies</b>.`; });
+    const fe = relPair('frenemies');
+    if (fe) opts.push(() => { setRel(fe[0], fe[1], 'rivals'); return `🔥 The shade between ${fe[0]} and ${fe[1]} boils over. They are now full-blown <b>rivals</b>.`; });
+    const up = unrelatedPair();
+    if (up) {
+        opts.push(() => { setRel(up[0], up[1], 'allies'); return `🤝 ${up[0]} and ${up[1]} shake on it and form an <b>alliance</b>.`; });
+        opts.push(() => { setRel(up[0], up[1], 'rivals'); return `⚔️ ${up[0]} and ${up[1]} clash over a stolen idea. They are now <b>rivals</b>.`; });
+        opts.push(() => { setRel(up[0], up[1], 'besties'); return `💖 ${up[0]} and ${up[1]} bond over a late night in the workroom. They are now <b>besties</b>.`; });
+    }
+    return opts.length ? pick(opts)() : null;
+}
+
+/* ============================================================
+   DRAMA GENERATORS
+   ============================================================ */
+function genWorkroom(active) {
+    const q = () => pick(active);
+    const q2 = (x) => pick(active.filter(y => y !== x));
+    const gens = [
+        () => { const p = relPair('besties'); return p && `${p[0]} and ${p[1]} get ready side by side, swapping tips and promising to protect each other this week.`; },
+        () => { const p = relPair('rivals'); return p && `${p[0]} sneers at ${p[1]}'s concept, and ${p[1]} fires back that ${p[0]} always plays it safe. The workroom goes silent.`; },
+        () => { const p = relPair('allies'); return p && `${p[0]} and ${p[1]} huddle in the corner to plan who they'd send to the bottom if they win.`; },
+        () => { const p = relPair('frenemies'); return p && `${p[0]} compliments ${p[1]}'s look through gritted teeth. Everyone can feel the shade.`; },
+        () => { const p = relPair('drag sisters'); return p && `${p[0]} gives their drag sister ${p[1]} a pep talk: "Family doesn't flop."`; },
+        () => { const p = relPair('former friends'); return p && `${p[0]} and ${p[1]} awkwardly avoid each other at the mirrors. Their old friendship is still a sore subject.`; },
+        () => { const a = q(); return `${a} opens up on the couches about their family's reaction to their drag, and the whole room goes quiet.`; },
+        () => { const a = q(), b = q2(a); return `${a} and ${b} argue over the last tube of lash glue. It gets louder than anyone expected.`; },
+        () => { const a = q(); return `${a} announces they're "not here to make friends." The workroom collectively rolls its eyes.`; },
+        () => { const a = q(), b = q2(a); return `${a} is caught talking about ${b}'s outfit — and ${b} overhears every word.`; },
+        () => { const a = q(), b = q2(a); return `${a}'s outfit rips in the workroom. ${b} jumps in with a needle and thread to save the day.`; },
+        () => { const a = q(); return `${a} gets emotional about missing home, and the other queens gather around for a group hug.`; },
+        () => { const a = q(); return `${a} is rehearsing so loudly that the others can't concentrate. Tempers start to rise.`; }
+    ];
+    const out = [];
+    const tried = shuf(gens);
+    for (const g of tried) { const t = g(); if (t) out.push({ html: t }); if (out.length >= 3) break; }
+    if (currentEpisode > 1 && Math.random() < 0.5) {
+        const c = maybeRelChange();
+        if (c) out.push({ html: c, cls: 'rel' });
+    }
+    return out;
+}
+
+function genUntucked(ctx) {
+    const { winner, topTwo, high, low, bottom, active } = ctx;
+    const others = active.filter(x => x !== winner);
+    const bq = () => pick(bottom.length ? bottom : active);
+    const gens = [
+        () => winner && `${winner} is congratulated for the win, but ${pick(others)} mutters that the judges "gave it away".`,
+        () => bottom.length > 1 && !ctx.noLipSync && `${bottom[0]} and ${bottom[1]} hug it out before the lip sync, promising to leave it all on the stage.`,
+        () => { const b = bq(); const o = pick(active.filter(x => x !== b)); return `${b} insists the critiques were unfair, while ${o} points out they ignored the feedback all week.`; },
+        () => low.length && `${pick(low)} admits the critiques stung and vows to bounce back stronger.`,
+        () => high.length && `${pick(high)} tells the room they should have been in the top. The top queens exchange glances.`,
+        () => { const b = bq(); const f = activeRels('besties').find(r => r.a === b || r.b === b); if (!f) return null; const friend = f.a === b ? f.b : f.a; return `${friend} comforts their bestie ${b}: "Whatever happens, I'm proud of you."`; },
+        () => { const b = bq(); const f = activeRels('rivals').find(r => r.a === b || r.b === b); if (!f) return null; const rv = f.a === b ? f.b : f.a; return `${rv} smirks that ${b} had it coming. ${b} tells them to watch their tongue.`; },
+        () => { const b = bq(); const f = activeRels('allies').find(r => r.a === b || r.b === b); if (!f) return null; const al = f.a === b ? f.b : f.a; return `${al} promises to keep ${b} close, but not everyone believes the alliance is sincere.`; },
+        () => { const p = relPair('frenemies'); return p && `${p[0]} offers ${p[1]} a "compliment" that sounds suspiciously like shade.`; },
+        () => { const p = relPair('former friends'); return p && `${p[0]} brings up the past with ${p[1]}. The room is silent as old wounds reopen.`; },
+        () => { const p = relPair('drag sisters'); return p && `${p[0]} defends their drag sister ${p[1]} when the other queens start picking them apart.`; },
+        () => { if (!winner) return null; const a = pick(others); return `${a} accuses ${winner} of being "fake nice" to the judges. ${winner} calmly says the work speaks for itself.`; },
+        () => { const b = bq(); return `${b} wipes off a lash in the mirror, whispering \"I can't go home tonight\" to nobody in particular.`; },
+        () => { const a = pick(active), b = pick(active.filter(x => x !== a)); return `${a} tells ${b} the runway looked like \"a costume party\". ${b} laughs it off, but isn't smiling.`; },
+        () => { const a = pick(active); return `${a} sits alone in the corner with a drink, rehearsing the lip sync in their head.`; },
+        () => winner && `${pick(others)} claps for ${winner} a little too slowly. The room notices.`,
+        () => high.length && `${pick(high)} and ${pick(active.filter(x => !high.includes(x)))} compare notes on the critiques and don't agree on a single thing.`,
+        () => { const a = pick(active), b = pick(active.filter(x => x !== a)); return `${a} accuses ${b} of ignoring the group and \"doing their own thing all week\". ${b} rolls their eyes.`; },
+        () => { const b = bq(); return `${b} stares at the floor while the queens around them avoid eye contact.`; },
+        () => { const a = pick(active); return `${a} confesses they didn't expect to survive this long and is overcome with emotion.`; },
+        () => { const a = pick(active), b = pick(active.filter(x => x !== a)); return `${a} spills the tea that ${b} spent the whole night rehearsing in the mirror instead of helping the team.`; },
+        () => { const a = pick(active); return `${a} jokes that the critiques were \"harsh but fair\", and nobody laughs.`; },
+        () => low.length && `${pick(low)} tells the room they're on thin ice and has to fight harder next week.`,
+        () => { const a = pick(active), b = pick(active.filter(x => x !== a)); return `${a} and ${b} get into a heated argument about whose fault the group performance was.`; },
+        () => { const b = bq(); const a = pick(active.filter(x => x !== b)); return `${a} hugs ${b} tight and whispers that they believe in them.`; },
+        () => { const a = pick(active); return `${a} quietly packs a few things into their bag, just in case.`; },
+        () => { const a = pick(active), b = pick(active.filter(x => x !== a)); return `${a} drops a bomb: \"I heard what you said about me in the workroom, ${b}.\" Everyone goes quiet.`; }
+    ];
+    const out = [];
+    for (const g of shuf(gens)) { const t = g(); if (t) out.push({ html: t }); if (out.length >= (ctx.limit || 3)) break; }
+    if (Math.random() < 0.45) {
+        const c = maybeRelChange();
+        if (c) out.push({ html: c, cls: 'rel' });
+    }
+    return out;
+}
+
+function genFight(active) {
+    if (Math.random() > 0.45 || active.length < 2) return [];
+    let pair = null;
+    for (const t of shuf(['rivals', 'former friends', 'frenemies'])) { const r = relPair(t); if (r) { pair = r; break; } }
+    if (!pair) { const x = pick(active), y = pick(active.filter(q => q !== x)); pair = [x, y]; }
+    const [a, b] = pair;
+    if (!active.includes(a) || !active.includes(b)) return [];
+    const third = active.filter(q => q !== a && q !== b);
+    const cause = pick([
+        `${a} accuses ${b} of stealing their concept`,
+        `${a} says ${b} has been talking behind their back since day one`,
+        `${b} says ${a} threw them under the bus in the critiques`,
+        `${a} blames ${b} for dragging the whole group down`,
+        `${b} calls ${a}'s fashion \"a walking costume party\"`
+    ]);
+    const L = [{ html: `🔥 <b>MEMORABLE FIGHT</b>: ${cause}.`, cls: 'bottom' },
+        { html: `${a}: \"Don't you dare put this on me!\"`, cls: 'rel' },
+        { html: `${b}: \"Honey, the only thing I'm putting on you is the truth.\"`, cls: 'rel' },
+        { html: pick([`${a} slams a makeup brush on the counter. The whole workroom freezes.`, `${b} throws a wig on the table and demands an apology.`, `Voices rise, and the other queens can only watch in shock.`]) }];
+    if (third.length) L.push({ html: `${pick(third)} tries to step in, but both queens talk right over them.` });
+    L.push({ html: pick([`${a} storms out of the workroom, slamming the door behind them.`, `${b} walks out, shaking, and ${a} doesn't follow.`, `They finally go quiet, but neither of them says sorry.`]) });
+    const r = relOf(a, b);
+    if (!r || !['rivals'].includes(r.type)) { setRel(a, b, 'rivals'); L.push({ html: `⚔️ After this blowup, <b>${a}</b> and <b>${b}</b> are now rivals.`, cls: 'rel' }); }
+    seasonMoments.push({ kind: 'fight', ep: currentEpisode, a, b, cause, sc: Math.random() * 2 + (r && r.type === 'rivals' ? 2 : 1) });
+    return L.map(l => ({ ...l, wait: 2600 }));
+}
+
+function recordLipSync(o) {
+    let sc = Math.random() * 2;
+    const r = relOf(o.a, o.b);
+    if (r) sc += ['rivals', 'former friends'].includes(r.type) ? 3 : (['besties', 'drag sisters'].includes(r.type) ? 2 : 1.5);
+    if (o.lipstick) sc += 2;
+    if (o.double) sc += 2;
+    if (o.upset) sc += 1.5;
+    seasonMoments.push({ kind: 'lipsync', ep: currentEpisode, sc, rel: r ? r.type : null, ...o });
+}
+
+function genMirror(mode, bots, topOnly) {
+    if (mode === 'three2') mode = 'sashay2';
+    if (mode === 'three1') mode = 'single';
+    const L = [];
+    const q = pick(['Sometime after the critiques,', 'As the queens return to the workroom,', 'Back at the mirror,']);
+    L.push({ html: `🪞 ${q} the lights flicker. A message is scrawled on the mirror in lipstick...`, cls: 'bottom', wait: 3200 });
+    let msg;
+    if (mode === 'noelim') msg = pick(["Tonight, only two queens will lip sync. Don't get too comfortable.", "Tonight, the top two lip sync for the win. Everyone else: watch and learn."]);
+    else if (formatType === 'dangerous') msg = pick(["Tonight, your fate is in the top two's hands.", "Someone will go home tonight, and it won't be me who decides."]);
+    else if (mode === 'sashay2') msg = pick(["Two of you will sashay away tonight.", "Two queens will be eliminated. Choose your battles wisely.", "Tonight, two dreams will end."]);
+    else msg = pick(["One of you will sashay away tonight.", "Someone's time in this competition is up. Don't f*** it up.", "Not everyone will be here next week."]);
+    L.push({ html: `"${msg}"`, cls: 'sashay', wait: 3400 });
+    const names = !topOnly && !(opts.alliancePower && (formatType === 'normal' || formatType === 'strategy')) ? bots.slice(0, 3) : [];
+    if (names.length) L.push({ html: `<b>${names.join('</b>, <b>')}</b> read it twice, hoping it isn't about them.`, cls: 'low', wait: 3000 });
+    else L.push({ html: `The queens go silent as they read the message, nobody daring to say a word.`, cls: 'low', wait: 3000 });
+    return L;
+}
+
+function genDebate(ctx) {
+    const { tops, bots, mode } = ctx;
+    if (!tops.length || bots.length < (mode === 'dangerous' ? 1 : 2)) return [];
+    const L = [];
+    const pb = bots.slice(0, 2);
+
+    if (mode === 'dangerous') L.push({ html: `🎤 The top two sit across from the safe queens, who know their fate is in the top two's hands tonight. The pleading begins.`, cls: 'rel', wait: 3200 });
+    else if (mode === 'legacy') L.push({ html: `🎤 The top two sit across from the bottom queens. Whoever wins the lip sync will decide their fate, so the pleading begins.`, cls: 'rel', wait: 3200 });
+    else if (mode === 'strategy') L.push({ html: `🎤 The bottom queens turn to <b>${tops[0]}</b>, who has the power to pick who faces the lip sync.`, cls: 'rel', wait: 3200 });
+    else L.push({ html: `🎤 The bottom queens argue their case in front of the top queens.`, cls: 'rel', wait: 3000 });
+
+    const pleas = [
+        "I've given everything every single week. Don't send me home over one bad challenge.",
+        "I know I didn't deliver tonight, but I have so much more to show.",
+        "Look at how much I've grown since the first episode.",
+        "I need this more than anyone in this room.",
+        "Please don't end my story here."
+    ];
+    const replies = {
+        'besties': (t, b) => `${t} tears up: "You're my bestie, but this is a game."`,
+        'rivals': (t, b) => `${t} smirks: "Honestly? You've been coasting. Don't expect mercy."`,
+        'allies': (t, b) => `${t} hesitates: "We made a promise... but I have to protect my own game."`,
+        'frenemies': (t, b) => `${t} says sweetly: "No shade, but I'm not sure you deserve to stay."`,
+        'drag sisters': (t, b) => `${t} sighs: "Family comes first... but family also tells the truth."`,
+        'former friends': (t, b) => `${t} snaps: "Don't act like we're still close."`
+    };
+    pb.forEach((b, i) => {
+        const t = tops[i % tops.length];
+        L.push({ html: `<b>${b}</b> to <b>${t}</b>: "${pick(pleas)}"`, wait: 3000 });
+        const r = relOf(t, b);
+        const reply = r ? replies[r.type](t, b) : `${t} replies: "I respect you, but I have to think about my own game."`;
+        L.push({ html: reply, cls: r ? 'rel' : '', wait: 3000 });
+    });
+
+    const [b1, b2] = pb;
+    if (b2) {
+        L.push({ html: `<b>${b1}</b> tells <b>${b2}</b> they've coasted all week and don't deserve to stay. <b>${b2}</b> fires back that actions speak louder than words.`, wait: 3200 });
+    }
+
+    if (tops.length >= 2) {
+        const [t1, t2] = tops;
+        const what = (mode === 'legacy' || mode === 'dangerous') ? "the power over everyone else's fate" : "a spot at the top";
+        L.push({ html: `<b>${t1}</b> turns to <b>${t2}</b>: "Honestly, you don't deserve ${what}." <b>${t2}</b> shoots back: "I earned it. Don't forget who actually delivered tonight."`, wait: 3400 });
+    }
+    return L;
+}
+
+function chooseLipstick(w, bots) {
+    const type = x => { const r = relOf(w, x); return r ? r.type : null; };
+    const bad = ['rivals', 'former friends'], good = ['besties', 'allies', 'drag sisters'];
+    const noun = { 'besties': 'bestie', 'allies': 'ally', 'drag sisters': 'drag sister' };
+    const badReason = t => t === 'rivals' ? "This isn't personal... okay, it's a little personal." : "I can't move past what happened between us.";
+    if (Math.random() < 0.7) {
+        const bads = bots.filter(x => bad.includes(type(x)));
+        const goods = bots.filter(x => good.includes(type(x)));
+        if (bads.length && bads.length < bots.length) { const x = pick(bads); return { name: x, reason: badReason(type(x)) }; }
+        if (goods.length && goods.length < bots.length) {
+            const prot = pick(goods);
+            return { name: pick(bots.filter(x => !goods.includes(x))), reason: `I couldn't live with myself if I sent my ${noun[type(prot)]} ${prot} home.` };
+        }
+    }
+    const ranked = bots.slice().sort((x, y) => ppeOf(x) - ppeOf(y));
+    if (ppeOf(ranked[0]) !== ppeOf(ranked[1])) return { name: ranked[0], reason: "I looked at the track records, and I have to be honest with myself." };
+    return { name: pick(bots), reason: "It was the hardest decision of my life. I went with my gut." };
+}
+function nameList(arr) {
+    const b = arr.map(x => `<b>${x}</b>`);
+    return b.length < 2 ? b.join('') : b.slice(0, -1).join(', ') + ' and ' + b[b.length - 1];
+}
+
+function lsReview(w, l) {
+    const r = Math.random();
+    const both = r < 0.2, bothFlop = r >= 0.2 && r < 0.32;
+    const wAte = both || (r >= 0.32 && r < 0.8), lFlop = bothFlop || (r >= 0.32 && r < 0.6) || r >= 0.8;
+    if (both) return [{ html: `🔥 Both <b>${w}</b> and <b>${l}</b> ATE that lip sync!`, cls: 'win', wait: 3000 }];
+    if (bothFlop) return [{ html: `💀 Both <b>${w}</b> and <b>${l}</b> FLOPPED that lip sync...`, cls: 'bottom', wait: 3000 }];
+    const out = [];
+    if (wAte) out.push({ html: `🔥 <b>${w}</b> ATE that lip sync!`, cls: 'win', wait: 2800 });
+    if (lFlop) out.push({ html: `💀 <b>${l}</b> FLOPPED the lip sync...`, cls: 'bottom', wait: 2800 });
+    return out;
+}
+function verdictLines(saved, out) {
+    const allStars = ['legacy', 'assassin', 'stars', 'teams', 'bracket'].includes(formatType);
+    const plural = out.length > 1;
+    const title = allStars ? (plural ? 'All Stars' : 'an All Star') : (plural ? 'drag superstars' : 'a drag superstar');
+    return [
+        { html: "Ladies, I've made my decision.", wait: 2800 },
+        { html: "…", cls: 'dots', wait: 3000 },
+        { html: nameList(saved), wait: 2800 },
+        { html: "…", cls: 'dots', wait: 2400 },
+        { html: "Shantay you stay.", cls: 'stay', wait: 3400 },
+        { html: nameList(out), wait: 2800 },
+        { html: "…", cls: 'dots', wait: 2800 },
+        { html: `You will always be ${title}.`, wait: 3400 },
+        { html: "Now", wait: 2200 },
+        { html: "…", cls: 'dots', wait: 2400 },
+        { html: "Sashay away.", cls: 'sashay', wait: 2000 }
+    ];
+}
+
+const perfPools = {
+    common: [
+        "took a big creative swing. Some of it landed, some of it didn't.",
+        "delivered a confident performance with a few small stumbles.",
+        "had a few shaky moments, but found a rhythm halfway through.",
+        "played it safe, and the judges looked unsure how to react.",
+        "gave a memorable performance that got the room talking.",
+        "went bold with their concept, and the reaction was split.",
+        "stayed polished and consistent from start to finish.",
+        "had a strong start but lost a little steam toward the end.",
+        "got big laughs from the room, though a few jokes didn't land.",
+        "seemed to be in their own world on stage. Hard to say how it will read.",
+        "looked nervous at the beginning, then settled into it.",
+        "brought plenty of energy, and some of the judges lit up."
+    ],
+    top: [
+        "had the room's attention for most of the performance, though the judges gave little away.",
+        "showed a clear point of view and a lot of charisma, even if a few details were rough."
+    ],
+    high: [
+        "delivered a solid, well-prepared performance that the judges seemed to enjoy.",
+        "committed fully and got a few strong reactions from the panel."
+    ],
+    mid: [
+        "did what was asked and not much more, which could go either way.",
+        "stayed consistent, without any real standout or disaster moments."
+    ],
+    low: [
+        "seemed unsure of the concept at times, though there were flashes of something good.",
+        "had a few rough patches, but fought through to the end."
+    ]
+};
+function performanceComment(q) {
+    let tier = 'mid';
+    if (q === epData.winner || (epData.topTwo && epData.topTwo.includes(q))) tier = 'top';
+    else if (epData.high.includes(q)) tier = 'high';
+    else if ((epData.low || []).includes(q) || (epData.bottomThree || epData.bottom || []).includes(q)) tier = 'low';
+    return Math.random() < 0.35 ? pick(perfPools[tier]) : pick(perfPools.common);
+}
+
+/* ---------- Dangerous format ---------- */
+function dangerPick(t, pool, exclude) {
+    const cand = pool.filter(q => !(exclude || []).includes(q));
+    const scored = cand.map(q => {
+        let sc = Math.random() * 1.5 - ppeOf(q) * 0.4;
+        const r = relOf(t, q);
+        if (r) sc += ['rivals', 'former friends'].includes(r.type) ? 2 : (['besties', 'allies', 'drag sisters'].includes(r.type) ? -2 : 0.5);
+        return { q, sc };
+    }).sort((a, b) => b.sc - a.sc);
+    return scored.length ? scored[0].q : null;
+}
+function dangerReason(t, q) {
+    const r = relOf(t, q);
+    if (r && r.type === 'rivals') return "we've never seen eye to eye";
+    if (r && r.type === 'former friends') return "I can't get past what happened between us";
+    if (r && r.type === 'frenemies') return "the shade has been there from day one";
+    return pick(["I just don't think they showed enough this week", "I think they've coasted for too long", "I'm not sure they have enough left to give"]);
+}
+function dangerDeliberation(textEl) {
+    const [t1, t2] = epData.topTwo;
+    const pool = epData.safe;
+    let mode = epData.elimMode || 'single';
+    if (mode === 'sashay2' && pool.length < 2) mode = 'single';
+    epData.dangerMode = mode;
+
+    revealLines(textEl, [
+        { html: `The top two retreat to think. The safe queens wait nervously: <b>${pool.join(', ')}</b>.`, wait: 3000 },
+        { html: `<b>${t1}</b> and <b>${t2}</b> each privately decide on a name.`, wait: 3000 },
+        { html: "But first, they have a lip sync to win...", wait: 2400 }
+    ], 2800);
+}
+function dangerElimination(textEl) {
+    const [t1, t2] = epData.topTwo;
+    const pool = epData.safe;
+    const mode = epData.dangerMode || 'single';
+
+    // the top two lip sync; each has their own choice
+    const p1 = ppeOf(t1), p2 = ppeOf(t2);
+    const w = Math.random() < 0.5 ? (p1 >= p2 ? t1 : t2) : pick([t1, t2]);
+    const l = w === t1 ? t2 : t1;
+    const pw = dangerPick(w, pool);
+    const pl = dangerPick(l, pool);
+    let targets = [];
+    if (mode === 'single') targets = [pw];
+    else if (mode === 'sashay2') targets = [pw, pl !== pw ? pl : dangerPick(l, pool, [pw])];
+
+    epData.winner = w;
+    recordLipSync({ a: t1, b: t2, song: epData.lipSyncSong, winner: w, out: targets[0] || null, double: mode === 'sashay2' });
+    seasonMoments.push({ kind: 'lipstick', ep: currentEpisode, sc: Math.random() * 2 + (relOf(w, pw) && ['rivals','former friends'].includes(relOf(w, pw).type) ? 3 : 0), w, chosen: targets, reason: dangerReason(w, pw) });
+    targets.forEach(n => {
+        contestants = contestants.filter(c => c !== n);
+        eliminatedQueens.push({ name: n, episode: currentEpisode, order: eliminatedQueens.length });
+    });
+    epData.eliminated = targets[0] || null;
+    epData.eliminatedAll = [...targets];
+    seasonHistory.push({ ...epData });
+
+    const L = [
+        { html: "The lip sync is over, and the judges have made their call...", wait: 3000 },
+        { html: "…", cls: 'dots', wait: 3000 },
+        { html: `The winner of tonight's lip sync is... <b>${w}</b>!`, cls: 'win', wait: 3400 },
+        { html: `<b>${w}</b> and <b>${l}</b>, it's time to reveal your choices.`, wait: 3200 },
+        { html: `<b>${w}</b>: "My choice is..."`, wait: 3200 },
+        { html: "…", cls: 'dots', wait: 2800 }
+    ];
+    if (mode === 'single' || mode === 'sashay2') {
+        L.push({ html: `<b>${pw}</b>.`, cls: 'sashay', wait: 3000 });
+        L.push({ html: `"${dangerReason(w, pw)}."`, cls: 'rel', wait: 3000 });
+        L.push({ html: `<b>${l}</b>: "And mine is..."`, wait: 3200 });
+        L.push({ html: "…", cls: 'dots', wait: 2600 });
+        if (mode === 'sashay2') {
+            L.push({ html: `<b>${targets[1]}</b>.`, cls: 'sashay', wait: 3000 });
+            L.push({ html: "Both choices stand.", cls: 'rel', wait: 2600 });
+        } else if (pl === pw) {
+            L.push({ html: `<b>${pl}</b>, too.`, cls: 'sashay', wait: 3000 });
+            L.push({ html: "They chose the same name.", cls: 'rel', wait: 2600 });
+        } else {
+            L.push({ html: `<b>${pl}</b>.`, cls: 'sashay', wait: 3000 });
+            L.push({ html: `But the lip sync belongs to <b>${w}</b>, so <b>${w}</b>'s choice stands.`, cls: 'rel', wait: 3200 });
+        }
+    } else {
+        L.push({ html: "No one. I'm not sending anyone home tonight.", cls: 'stay', wait: 3200 });
+        L.push({ html: `<b>${l}</b>: "And mine is..."`, wait: 3200 });
+        L.push({ html: "…", cls: 'dots', wait: 2600 });
+        L.push({ html: "No one either.", cls: 'stay', wait: 3000 });
+    }
+    const rest = pool.filter(q => !targets.includes(q));
+    if (rest.length) L.push({ html: `${rest.map(q => '<b>' + q + '</b>').join(', ')}, shantay you stay.`, cls: 'stay', wait: 3200 });
+    if (targets.length) {
+        L.push({ html: "…", cls: 'dots', wait: 2400 });
+        targets.forEach((n, i) => L.push({ html: `<b>${n}</b>, sashay away...`, cls: 'sashay', wait: i < targets.length - 1 ? 3000 : 1500 }));
+        if (targets.length === 2) L.push({ html: "A double elimination!", wait: 1500 });
+    } else {
+        L.push({ html: epData.nonElim ? "It's a non-elimination episode. No one is going home tonight!" : "Tonight, no one is going home!", wait: 1500 });
+    }
+    revealLines(textEl, L, 2800);
+}
+
+/* ---------- LaLaPaRuZa Lip Sync Smackdown (tournament) ---------- */
+function runLalaparuza(pool) {
+    let alive = shuf(pool);
+    const matches = [], losersByRound = [];
+    let round = 0;
+    while (alive.length > 1) {
+        round++;
+        const song = pick(lipSyncSongs);
+        const order = shuf(alive);
+        const next = [], losers = [];
+        for (let i = 0; i + 1 < order.length; i += 2) {
+            const a = order[i], b = order[i + 1];
+            const wa = 1 + ppeOf(a) * 0.15, wb = 1 + ppeOf(b) * 0.15;
+            const w = Math.random() < wa / (wa + wb) ? a : b;
+            matches.push({ round, a, b, winner: w, song });
+            next.push(w);
+            losers.push(w === a ? b : a);
+        }
+        if (order.length % 2 === 1) {
+            const bye = order[order.length - 1];
+            matches.push({ round, bye, song });
+            next.push(bye);
+        }
+        losersByRound.push(losers);
+        alive = next;
+    }
+    const fromBottom = [];
+    losersByRound.forEach(ls => fromBottom.push(...shuf(ls)));
+    // best to worst: champion, finalist loser, semifinal losers ... first-round losers
+    return { order: [alive[0], ...fromBottom.reverse()], matches };
+}
+
+function finaleBracketLipsync(textEl) {
+    const { semis, final } = finale.bracket;
+    const L = [
+        { html: "The judges have decided: the finale will be settled in a lip sync battle!", wait: 3000 },
+        { html: "Two semifinal battles. The winners will meet in the final lip sync battle for the crown.", wait: 3200 }
+    ];
+    semis.forEach((m, i) => {
+        L.push({ html: `<b>Semifinal ${i + 1}</b>: <b>${m.a}</b> vs <b>${m.b}</b>`, cls: 'rel', wait: 3000 });
+        L.push({ html: `The song is: <b>${m.song}</b>.`, wait: 2600 });
+        L.push({ html: `<b>${m.a}</b> and <b>${m.b}</b> take the stage...`, wait: 3000 });
+        L.push({ html: "…", cls: 'dots', wait: 2600 });
+        L.push({ html: `Winner: <b>${m.winner}</b>`, cls: 'stay', wait: 3200 });
+        L.push({ html: `<b>${m.loser}</b>, thank you for everything you gave this season. Sashay away...`, cls: 'sashay', wait: 3400 });
+    });
+    L.push({ html: `<b>Final lip sync battle</b>: <b>${final[0]}</b> vs <b>${final[1]}</b>`, cls: 'rel', wait: 3200 });
+    L.push({ html: `The song is: <b>${finale.song}</b>.`, wait: 2600 });
+    L.push({ html: `<b>${final[0]}</b> and <b>${final[1]}</b> take the stage...`, wait: 3000 });
+    L.push({ html: "Two queens, one crown, no room for mistakes.", wait: 2400 });
+    revealLines(textEl, L, 2600);
+}
+
+/* ---------- LaLaPaRuZa night: the winner and high queens save one of the bottom three ---------- */
+function lalaSavePick(t, pool) {
+    const scored = pool.map(q => {
+        let sc = Math.random() * 1.5 + ppeOf(q) * 0.3;
+        const r = relOf(t, q);
+        if (r) sc += ['besties', 'allies', 'drag sisters'].includes(r.type) ? 2 : (['rivals', 'former friends'].includes(r.type) ? -2 : 0.3);
+        return { q, sc };
+    }).sort((a, b) => b.sc - a.sc);
+    return scored[0].q;
+}
+function lalaSavePhrase(t, q) {
+    const r = relOf(t, q);
+    if (r && ['besties', 'allies', 'drag sisters'].includes(r.type)) return ", because we always have each other's backs";
+    if (r && ['rivals', 'former friends'].includes(r.type)) return ", even though we haven't always gotten along";
+    return pick([", because I think they still have more to show", ", because I believe in their potential", ", because they fought hard tonight"]);
+}
+
+/* ---------- Alliance power: a winner saves an ally who is at risk ---------- */
+function applyAlliancePower(L) {
+    if (!opts.alliancePower || formatType === 'legacy' || formatType === 'dangerous' || !epData.winner || epData.lalaSave) return;
+    const w = epData.winner;
+    const atRisk = epData.bottomThree || epData.bottom;
+    const ally = atRisk.find(q => { const r = relOf(w, q); return r && r.type === 'allies'; });
+    if (!ally || Math.random() > 0.65) return;
+    const pool = (epData.low && epData.low.length) ? epData.low : epData.safe;
+    const cands = pool.filter(q => !atRisk.includes(q) && q !== w);
+    if (!cands.length) return;
+    const repl = pick(cands);
+
+    const swap = arr => arr.map(q => q === ally ? repl : q);
+    if (epData.bottomThree) epData.bottomThree = swap(epData.bottomThree);
+    epData.bottom = swap(epData.bottom);
+    epData.low = (epData.low || []).filter(q => q !== repl);
+    epData.safe = epData.safe.filter(q => q !== repl);
+    epData.safe.push(ally);
+    epData.allianceSave = { saver: w, ally, replacement: repl };
+
+    L.push({ html: `🤝 As the challenge winner, <b>${w}</b> holds a special power: the power to save one queen who is at risk.`, wait: 3400 });
+    L.push({ html: `<b>${w}</b>: "The queen I'm saving is..."`, wait: 3200 });
+    L.push({ html: "…", cls: 'dots', wait: 2800 });
+    L.push({ html: `<b>${ally}</b>.`, cls: 'stay', wait: 3000 });
+    L.push({ html: `<b>${w}</b> and <b>${ally}</b> are allies, and <b>${w}</b> wasn't going to let their alliance fall apart.`, cls: 'rel', wait: 3200 });
+    L.push({ html: `<b>${ally}</b> is safe, but someone has to take their place. <b>${repl}</b>, you are now at risk.`, cls: 'bottom', wait: 3400 });
+}
+
+/* ============================================================
+   SLOW ANIMATED REVEALS
+   ============================================================ */
+let revealToken = 0;
+let currentReveal = null;
+
+function addLine(container, ln) {
+    const d = document.createElement('div');
+    d.className = 'reveal-line ' + (ln.cls || '');
+    d.innerHTML = ln.html;
+    container.appendChild(d);
+    requestAnimationFrame(() => requestAnimationFrame(() => d.classList.add('show')));
+}
+function revealLines(container, lines, defDelay) {
+    const token = ++revealToken;
+    const btn = document.getElementById('next-btn');
+    const skip = document.getElementById('skip-btn');
+    container.innerHTML = '';
+    btn.disabled = true;
+    skip.style.display = 'block';
+    currentReveal = { container, lines };
+    let i = 0;
+    function finish() {
+        if (token !== revealToken) return;
+        btn.disabled = false;
+        skip.style.display = 'none';
+        currentReveal = null;
+        if (afterReveal) { const f = afterReveal; afterReveal = null; f(); }
+    }
+    function step() {
+        if (token !== revealToken) return;
+        if (i >= lines.length) { finish(); return; }
+        const ln = typeof lines[i] === 'string' ? { html: lines[i] } : lines[i];
+        addLine(container, ln);
+        i++;
+        if (i >= lines.length) setTimeout(finish, 900);
+        else setTimeout(step, ln.wait || defDelay || 1800);
+    }
+    step();
+}
+function skipReveal() {
+    if (!currentReveal) return;
+    revealToken++;
+    const { container, lines } = currentReveal;
+    container.innerHTML = '';
+    lines.forEach(l => addLine(container, typeof l === 'string' ? { html: l } : l));
+    document.getElementById('next-btn').disabled = false;
+    document.getElementById('skip-btn').style.display = 'none';
+    currentReveal = null;
+    if (afterReveal) { const f = afterReveal; afterReveal = null; f(); }
+}
+
+/* ============================================================
+   EPISODE SETUP
+   ============================================================ */
+const basePhases = ["mini", "drama", "maxi", "runway", "judging", "untucked", "deliberation", "lipsync", "elimination", "trackrecord"];
+const finPhases = ["fin_intro", "fin_talent", "fin_runway", "fin_lipsync", "fin_crown", "fin_memorable"];
+
+function savedQueenPool(cast) {
+    const mine = new Set(cast.map(n => String(n).toLowerCase()));
+    const seen = new Set(), out = [];
+    getEditions().forEach(e => (e.allCast || []).forEach(n => {
+        const k = String(n).toLowerCase();
+        if (!mine.has(k) && !seen.has(k)) { seen.add(k); out.push(n); }
+    }));
+    return out;
+}
+function pickAssassin() {
+    const pool = savedQueenPool(allCast);
+    let fresh = pool.filter(n => !usedAssassins.includes(n));
+    if (!fresh.length) { usedAssassins = []; fresh = pool; }
+    const a = pick(fresh);
+    usedAssassins.push(a);
+    return a;
+}
+function makeDrama(a) { return [...genWorkroom(a), ...genFight(a)]; }
+
+/* ---------- Teams / Pairs ---------- */
+function genTeams(cast) {
+    const sh = shuf(cast), out = [];
+    for (let i = 0; i + 1 < sh.length; i += 2) out.push([sh[i], sh[i + 1]]);
+    return out;
+}
+function renderTeamPanel() {
+    const box = document.getElementById('team-panel');
+    if (formatType !== 'teams') { box.style.display = 'none'; return; }
+    box.style.display = 'block';
+    let h = '<label>Teams (change a queen to swap, or re-roll)</label>';
+    teamPairs.forEach((t, i) => {
+        h += '<div style="display:flex; gap:6px; margin-bottom:6px;">';
+        [0, 1].forEach(j => {
+            h += `<select onchange="setTeamMember(${i},${j},this.value)">` + allCast.map(q => `<option value="${q}"${q === t[j] ? ' selected' : ''}>${q}</option>`).join('') + '</select>';
+        });
+        h += '</div>';
+    });
+    h += '<button class="btn btn-secondary" style="width:100%;" onclick="rerollTeams()">🎲 Re-roll teams</button>';
+    box.innerHTML = h;
+}
+function setTeamMember(i, j, name) {
+    let pi = -1, pj = -1;
+    teamPairs.forEach((t, a) => t.forEach((q, b) => { if (q === name) { pi = a; pj = b; } }));
+    const old = teamPairs[i][j];
+    teamPairs[i][j] = name;
+    if (pi >= 0) teamPairs[pi][pj] = old;
+    renderTeamPanel();
+}
+function rerollTeams() { teamPairs = genTeams(allCast); renderTeamPanel(); }
+const teamLabel = t => `<b>${t[0]}</b> &amp; <b>${t[1]}</b>`;
+
+function setupTeamEpisode() {
+    document.getElementById('episode-header').innerText = `Episode ${currentEpisode} • ${contestants.length / 2} teams remaining`;
+    const active = shuf(contestants);
+    const ts = shuf(teamPairs.filter(t => t.every(q => contestants.includes(q))));
+    const T = ts.length;
+    const winT = ts[0], highT = T >= 5 ? [ts[1]] : [], botT = ts.slice(T - 2), lowT = T >= 6 ? [ts[T - 3]] : [];
+    const used = [winT, ...highT, ...botT, ...lowT];
+    const fl = a => a.reduce((x, t) => x.concat(t), []);
+    const safe = fl(ts.filter(t => !used.includes(t)));
+    const bottom = fl(botT), high = fl(highT), low = fl(lowT);
+    const reps = botT.map(t => pick(t));
+    const tag = botT.map(() => Math.random() < 0.25);
+    const perf = botT.map((t, i) => tag[i] ? t.find(q => q !== reps[i]) : reps[i]);
+    epData = {
+        episodeNum: currentEpisode, activePool: [...active], miniWinner: pick(active), challenge: nextChallenge(), lalaMatches: null,
+        drama: makeDrama(active),
+        untucked: genUntucked({ winner: winT[0], high, low, active, bottom, limit: 3, noLipSync: false }),
+        winner: winT[0], coWinner: winT[1], high, safe, low, bottom, nonElim: false, elimMode: 'single',
+        eliminated: null, eliminatedAll: [], lipSyncSong: pick(lipSyncSongs), assassin: null, starBlocked: null,
+        teamMode: true, teamNonElim: teamPad.includes(currentEpisode) && contestants.length > 4, winTeam: winT, botTeams: botT, tReps: reps, tTag: tag, tPerf: perf
+    };
+    epPhases = currentEpisode === 1 ? ["intro", ...basePhases] : [...basePhases];
+    currentPhaseIndex = 0;
+    runPhase();
+}
+function teamJudging(textEl) {
+    const L = [{ html: "Ladies, I've made my decisions.", wait: 2400 }];
+    const tOf = list => teamPairs.filter(t => list.includes(t[0]));
+    tOf(epData.safe).forEach(t => L.push({ html: teamLabel(t), wait: 1500 }));
+    L.push({ html: "…", cls: 'dots', wait: 2200 });
+    tOf(epData.high).forEach(t => L.push({ html: `${teamLabel(t)}, great work this week. You are safe.`, cls: 'high', wait: 2000 }));
+    L.push({ html: `${teamLabel(epData.winTeam)}, condragulations! You are the winning team of today's challenge!`, cls: 'win', wait: 3200 });
+    L.push({ html: "…", cls: 'dots', wait: 2200 });
+    tOf(epData.low).forEach(t => L.push({ html: `${teamLabel(t)}, you are safe, but you're on thin ice...`, cls: 'low', wait: 2200 }));
+    epData.botTeams.forEach(t => L.push({ html: `${teamLabel(t)}, you are the bottom teams of the week.`, cls: 'bottom', wait: 2400 }));
+    revealLines(textEl, L, 1600);
+}
+function teamElimination(textEl) {
+    const [b1, b2] = epData.botTeams, [p1, p2] = epData.tPerf;
+    const avg = t => (ppeOf(t[0]) + ppeOf(t[1])) / 2;
+    const w = Math.random() < 0.5 ? (avg(b1) >= avg(b2) ? 0 : 1) : (Math.random() < 0.5 ? 0 : 1);
+    if (epData.teamNonElim) {
+        const wP0 = epData.tPerf[w];
+        seasonHistory.push({ ...epData });
+        revealLines(textEl, [
+            { html: "The lip sync is over, and the judges have made their call...", wait: 3000 },
+            { html: "…", cls: 'dots', wait: 3000 },
+            { html: `The winner of tonight's lip sync is... <b>${wP0}</b>!`, cls: 'win', wait: 3400 },
+            ...lsReview(wP0, epData.tPerf[1 - w]),
+            { html: `${teamLabel(b1)} and ${teamLabel(b2)}, nobody is going home tonight. But don't get too comfortable...`, cls: 'stay', wait: 3400 }
+        ], 2800);
+        return;
+    }
+    const wT = epData.botTeams[w], lT = epData.botTeams[1 - w], wP = epData.tPerf[w];
+    contestants = contestants.filter(c => !lT.includes(c));
+    lT.forEach(n => eliminatedQueens.push({ name: n, episode: currentEpisode, order: eliminatedQueens.length }));
+    epData.eliminated = lT[0];
+    epData.eliminatedAll = [...lT];
+    recordLipSync({ a: p1, b: p2, song: epData.lipSyncSong, winner: wP, out: null, double: true });
+    seasonHistory.push({ ...epData });
+    revealLines(textEl, [
+        { html: "The lip sync is over, and the judges have made their call...", wait: 3000 },
+        { html: "…", cls: 'dots', wait: 3000 },
+        { html: `The winner of tonight's lip sync is... <b>${wP}</b>!`, cls: 'win', wait: 3400 },
+        ...lsReview(wP, epData.tPerf[1 - w]),
+        ...verdictLines(wT, lT)
+    ], 2800);
+}
+
+/* ---------- Bracket Tournament ---------- */
+function setupBracketEpisode() {
+    const e = currentEpisode, sc = brSched[e - 1], bi = sc.bi, pool = brBrackets[bi], last = sc.k === sc.n;
+    const s = shuf(pool), p = s.length;
+    const hN = p >= 5 ? 2 : 1, bN = p >= 5 ? 2 : 1;
+    const winner = s[0], high = s.slice(1, 1 + hN), bottom = s.slice(p - bN), safe = s.slice(1 + hN, p - bN);
+    const others = pool.filter(q => q !== winner);
+    const allies = others.filter(q => { const r = relOf(winner, q); return r && ['besties', 'allies', 'drag sisters'].includes(r.type); });
+    const gift = (allies.length && Math.random() < 0.6) ? pick(allies) : pick(others);
+    brPts[winner] = (brPts[winner] || 0) + 3;
+    brPts[gift] = (brPts[gift] || 0) + 2;
+    let adv = [], out = [];
+    if (last) {
+        const ranked = shuf(pool).sort((a, b) => ((brPts[b] || 0) - (brPts[a] || 0)) || (ppeOf(b) - ppeOf(a)));
+        adv = ranked.slice(0, brAdv);
+        out = ranked.slice(brAdv).reverse();
+    }
+    document.getElementById('episode-header').innerText = `Bracket ${bi + 1} • Episode ${sc.k} of ${sc.n}`;
+    epData = {
+        episodeNum: e, activePool: [...pool], miniWinner: pick(pool), challenge: nextChallenge(), lalaMatches: null,
+        drama: makeDrama(pool),
+        untucked: genUntucked({ winner, high, low: [], active: pool, bottom, limit: 3, noLipSync: true }),
+        winner, coWinner: null, high, safe, low: [], bottom, nonElim: false, elimMode: 'noelim',
+        eliminated: null, eliminatedAll: [], lipSyncSong: pick(lipSyncSongs), assassin: null, starBlocked: null,
+        brIdx: bi, brGift: gift, brLast: last, brAdvance: adv,
+        tally: [], tallyOut: out, tallyApplied: false
+    };
+    epPhases = ["mini", "drama", "maxi", "runway", "judging", "untucked", "brpoints", "trackrecord"];
+    if (e === 1) epPhases.unshift("intro");
+    currentPhaseIndex = 0;
+    runPhase();
+}
+
+function runLadder(seeds) {
+    const wt = n => 1 + (starCount[n] || 0) * 0.4 + ppeOf(n) * 0.5;
+    const rounds = [];
+    let cur = seeds[seeds.length - 1];
+    for (let i = seeds.length - 2; i >= 0; i--) {
+        const opp = seeds[i];
+        const win = Math.random() < wt(cur) / (wt(cur) + wt(opp)) ? cur : opp;
+        rounds.push({ a: cur, b: opp, winner: win, loser: win === cur ? opp : cur, song: pick(lipSyncSongs) });
+        cur = win;
+    }
+    return { rounds, order: [cur, ...rounds.map(r => r.loser).reverse()] };
+}
+function ladderCells(lad, main) {
+    const cells = {}, R = lad.rounds.length;
+    cells[lad.order[0]] = { text: 'WINNER', cls: main ? 'WINNER' : 'L2WIN' };
+    lad.rounds.forEach((r, i) => {
+        const fe = R - 1 - i;
+        cells[r.loser] = { text: `LOST ${i + 1}${getOrdinalSuffix(i + 1).toUpperCase()} ROUND`, cls: main ? ['RUNNER-UP', 'FINALIST', 'LOST1', 'LOST1'][fe] : ['L2A', 'L2B', 'L2C', 'L2C'][fe] };
+    });
+    return cells;
+}
+function setupStarTally() {
+    starTallyDone = true;
+    const keep = finalCount();
+    const sc = n => starCount[n] || 0;
+    const ranked = shuf(contestants).sort((a, b) => (sc(b) - sc(a)) || (ppeOf(b) - ppeOf(a)));
+    const rest = ranked.slice(keep);
+    const g2 = rest.slice(0, 4);
+    let lad2 = null, cells2 = {};
+    if (g2.length >= 2) { lad2 = runLadder(g2); cells2 = ladderCells(lad2, false); }
+    const others = rest.slice(g2.length);
+    others.forEach(q => { cells2[q] = { text: 'ELIM', cls: 'L2E' }; });
+    starsCells2 = cells2;
+    epData = {
+        episodeNum: currentEpisode, activePool: [...contestants], miniWinner: null, challenge: { name: "Star Count" },
+        drama: [], untucked: [], winner: null, coWinner: null, high: [], safe: [...contestants], low: [], bottom: [],
+        nonElim: false, topTwo: null, elimMode: 'noelim', eliminated: null, eliminatedAll: [], starsFmt: true, noHistory: true,
+        tally: ranked.map(q => ({ q, s: sc(q) })), tallyKeep: ranked.slice(0, keep), lad2, others,
+        tallyOut: [...others.slice().reverse(), ...(lad2 ? lad2.order.slice().reverse() : g2.slice().reverse())], tallyApplied: false
+    };
+    document.getElementById('episode-header').innerText = `Star Count • ${contestants.length} queens`;
+    epPhases = ["startally", "trackrecord"];
+    currentPhaseIndex = 0;
+    runPhase();
+}
+function applyStarTally() {
+    epData.tallyApplied = true;
+    epData.tallyOut.forEach(n => {
+        contestants = contestants.filter(c => c !== n);
+        eliminatedQueens.push({ name: n, episode: currentEpisode, order: eliminatedQueens.length });
+    });
+    epData.eliminated = epData.tallyOut[epData.tallyOut.length - 1] || null;
+    epData.eliminatedAll = [...epData.tallyOut];
+    if (!epData.noHistory) seasonHistory.push({ ...epData });
+}
+
+function setupEpisode() {
+    if (formatType === 'teams') { setupTeamEpisode(); return; }
+    if (formatType === 'bracket' && currentEpisode <= brSched.length) { setupBracketEpisode(); return; }
+    let wcLine = null;
+    if (formatType === 'bracket' && !brWild) {
+        brWild = true;
+        const gone = eliminatedQueens.map(e => e.name);
+        if (gone.length) {
+            const wc = gone.slice().sort((a, b) => (ppeOf(b) - ppeOf(a)) || (Math.random() - 0.5))[0];
+            eliminatedQueens = eliminatedQueens.filter(e => e.name !== wc);
+            contestants.push(wc);
+            wcLine = `🃏 Wild Card! The judges bring back <b>${wc}</b> from the bracket stage to join the merged competition!`;
+        }
+    }
+    document.getElementById('episode-header').innerText = `Episode ${currentEpisode} • ${contestants.length} queens remaining`;
+
+    const active = shuf(contestants);
+    const miniWinner = active[0];
+    const lala = formatType !== 'stars' && opts.lalaMode === 'sometimes' && currentEpisode > 1 && !lalaDone && active.length === 6;
+    if (lala) lalaDone = true;
+    const challenge = lala ? lalaChallenge : nextChallenge();
+    let midNonElim = !lala && !midNonElimDone && midNonElimEp > 0 && currentEpisode >= midNonElimEp && currentEpisode > 1 && contestants.length >= finalCount() + 3;
+    if (midNonElim) midNonElimDone = true;
+    // ideal season: 10 episodes in total (9 before the finale). Pad with a non-elimination episode when the
+    // season would run short, or force a double sashay when it would run long.
+    let ctrlForce = false;
+    if (['normal', 'legacy', 'strategy', 'dangerous', 'assassin'].includes(formatType) && !lala && currentEpisode > 1) {
+        const rem = 9 - (currentEpisode - 1), need = contestants.length - finalCount();
+        if (!midNonElim && need < rem && contestants.length >= finalCount() + 3 && Math.random() < (rem - need) / rem) midNonElim = true;
+        else if (need > rem && contestants.length - 2 >= finalCount() && ['normal', 'strategy'].includes(formatType)) ctrlForce = true;
+    }
+    const nonElim = (currentEpisode === 1 && opts.nonElimPremiere) || midNonElim || formatType === 'stars';
+    let elimMode = decideElimMode(nonElim);
+    if (formatType === 'assassin' && !nonElim) elimMode = 'single';
+    if (ctrlForce && !nonElim && elimMode !== 'sashay2') elimMode = 'sashay2';
+
+    let s = shuf(active);
+    const blockedNow = formatType === 'stars' ? blockedQueen : null;
+    blockedQueen = null;
+    let lalaMatches = null;
+    if (lala) {
+        const r = runLalaparuza(active);
+        s = r.order;
+        lalaMatches = r.matches;
+    }
+    const count = s.length;
+    const dangerous = formatType === 'dangerous';
+    const topOnly = dangerous || nonElim;   // top 2 only, no bottom
+    const start = (formatType === 'legacy' || topOnly) ? 2 : 1;
+    const wantCoin = opts.coinMode === 'every'
+        || (opts.coinMode === 'premiere' && currentEpisode === 1)
+        || (opts.coinMode === 'random' && (currentEpisode === 1 || Math.random() < 0.3));
+    const coin = formatType !== 'assassin' && !topOnly && wantCoin && count >= start + 3;
+    const lalaSaveEp = lala && !coin && (formatType === 'normal' || formatType === 'strategy');
+    const b3 = coin || formatType === 'strategy' || lalaSaveEp;
+
+    // sometimes a three-way bottom: all three lip sync (standard) or the winner picks one of three lipsticks (legacy)
+    const threeWay = !!opts.threeWay && !b3 && !topOnly && (formatType === 'normal' || formatType === 'legacy')
+        && count >= start + 4 && (elimMode === 'single' || elimMode === 'sashay2') && Math.random() < 0.22;
+    if (threeWay && formatType === 'normal') elimMode = elimMode === 'sashay2' ? 'three2' : 'three1';
+    let extra = {}, low = [];
+    let bottomEnd = count - (b3 ? 3 : 2);
+    // bottom 3 = one "low" queen + the bottom 2 (normal and legacy formats)
+    if (!b3 && !topOnly && count - 3 >= start) { low = [s[count - 3]]; bottomEnd = count - 3; }
+    if (threeWay) low = [];
+    if (topOnly) bottomEnd = count;
+    const winner = s[0];
+    if (formatType === 'legacy' || topOnly) extra.topTwo = [s[0], s[1]];
+    const mid = s.slice(start, bottomEnd);
+    // judges' decision shows 6 queens: top 3 (winner + 2 high) and bottom 3. Everyone else is safe.
+    const maxHigh = nonElim ? (formatType === 'stars' ? 4 : 0) : (extra.topTwo ? 1 : 2);
+    const high = mid.slice(0, maxHigh);
+    const safe = mid.slice(maxHigh);
+    const bottom = topOnly ? [] : s.slice(count - (threeWay ? 3 : 2));
+    if (b3 || threeWay) extra.bottomThree = s.slice(count - 3);
+    if (threeWay) extra.threeWay = true;
+    if (coin) extra.coin = true;
+
+    const drama = [...(wcLine ? [{ html: wcLine, cls: 'rel', wait: 3200 }] : []), ...genWorkroom(active), ...genFight(active)];
+    const bots = topOnly ? safe : (extra.bottomThree || bottom);
+    const tops = extra.topTwo ? extra.topTwo : [winner, high[0] || safe[0]].filter(Boolean);
+    const untucked = [
+        ...genUntucked({ winner: extra.topTwo ? null : winner, topTwo: extra.topTwo, high, low, active, bottom: bots, limit: 3, noLipSync: topOnly }),
+        ...(nonElim && !dangerous ? [] : genDebate({ tops, bots, mode: formatType })),
+        ...genMirror(elimMode, bots, topOnly)
+    ];
+
+    const pb = basePhases;
+    epPhases = currentEpisode === 1 ? ["intro", ...pb] : [...pb];
+
+    epData = {
+        ...extra,
+        episodeNum: currentEpisode,
+        activePool: [...active],
+        miniWinner, challenge, lalaMatches, lalaSave: lalaSaveEp, drama, untucked,
+        winner: dangerous ? null : winner, high, safe, low, bottom,
+        coWinner: (nonElim && !dangerous && formatType !== 'stars' && Math.random() < 0.2) ? s[1] : null,
+        starsFmt: formatType === 'stars',
+        nonElim, elimMode,
+        assassin: (formatType === 'assassin' && !nonElim) ? pickAssassin() : null,
+        starBlocked: null, starDenied: blockedNow,
+        eliminated: null,
+        eliminatedAll: [],
+        lipSyncSong: pick(lipSyncSongs)
+    };
+
+    if (nonElim) document.getElementById('episode-header').innerText += formatType === 'stars' ? (currentEpisode === dblStarEp ? ' • 🌟 Double Star Episode' : ' • ⭐ Stars Episode') : ' • Non-Elimination Episode';
+    if (blockedNow) document.getElementById('episode-header').innerText += ' • 🚫 ' + blockedNow + " can't earn a star";
+    currentPhaseIndex = 0;
+    runPhase();
+}
+
+function nextPhase() {
+    currentPhaseIndex++;
+    const list = inFinale ? finPhases : epPhases;
+    if (currentPhaseIndex >= list.length) {
+        if (inFinale) { showResults(); return; }
+        currentEpisode++;
+        if (formatType === 'stars' && !starTallyDone && currentEpisode > starEps && contestants.length > finalCount()) setupStarTally();
+        else if (contestants.length <= finalCount()) startFinale();
+        else setupEpisode();
+    } else {
+        if (!inFinale && epData.tally && !epData.tallyApplied && list[currentPhaseIndex] === 'trackrecord') applyStarTally();
+        runPhase();
+    }
+}
+
+/* ============================================================
+   PHASE RENDERING
+   ============================================================ */
+function addBadge(container, text) {
+    const b = document.createElement('div');
+    b.className = 'mini-badge';
+    b.innerText = text;
+    container.appendChild(b);
+}
+function bottomList() { return epData.bottomThree || epData.bottom; }
+
+function runPhase() {
+    afterReveal = null;
+    runPhaseCore();
+    updateLiveTrack();
+}
+let trackOpenPref = false, trackOpenNow = true, trackLabel = 'Track Record So Far', trackToggleable = false;
+function applyTrackOpen(open, label, toggleable) {
+    trackOpenNow = open; trackLabel = label; trackToggleable = toggleable;
+    document.getElementById('sim-track-title').innerText = (open ? '▼ ' : '▶ ') + label;
+    document.getElementById('sim-track-body').style.display = open ? 'block' : 'none';
+}
+function toggleTrack() {
+    const nowOpen = !trackOpenNow;
+    const lbl = trackToggleable ? 'Track Record So Far (tap to ' + (nowOpen ? 'collapse' : 'expand') + ')' : trackLabel;
+    applyTrackOpen(nowOpen, lbl, trackToggleable);
+    if (trackToggleable) trackOpenPref = nowOpen;
+}
+function showFinalTrack() {
+    const st = { ...currentState(), finalists: finale.order || contestants, finaleCells: finale.cells || null };
+    applyTrackOpen(true, '🏆 Final Track Record', false);
+    document.getElementById('sim-track').style.display = 'block';
+    renderTrackHTML(buildTrackData(st, true), document.getElementById('sim-head'), document.getElementById('sim-body'));
+}
+function updateLiveTrack() {
+    const list = inFinale ? finPhases : epPhases;
+    const phase = list[currentPhaseIndex];
+    if (phase === 'trackrecord') { applyTrackOpen(true, 'Track Record', false); return; }
+    if (phase === 'fin_crown') {
+        if (currentReveal) afterReveal = showFinalTrack; else showFinalTrack();
+        return;
+    }
+    if (phase === 'fin_memorable') { showFinalTrack(); return; }
+    if (!seasonHistory.length) return;
+    applyTrackOpen(trackOpenPref, 'Track Record So Far (tap to ' + (trackOpenPref ? 'collapse' : 'expand') + ')', true);
+    document.getElementById('sim-track').style.display = 'block';
+    renderTrackHTML(buildTrackData(currentState(), false), document.getElementById('sim-head'), document.getElementById('sim-body'));
+}
+
+function runPhaseCore() {
+    const list = inFinale ? finPhases : epPhases;
+    const phase = list[currentPhaseIndex];
+    const titleEl = document.getElementById('stage-title');
+    const textEl = document.getElementById('stage-text');
+    const extrasEl = document.getElementById('stage-extras');
+    const btnEl = document.getElementById('next-btn');
+
+    revealToken++;
+    currentReveal = null;
+    document.getElementById('skip-btn').style.display = 'none';
+    btnEl.disabled = false;
+    extrasEl.innerHTML = '';
+    document.getElementById('sim-track').style.display = 'none';
+
+    const isLastPhase = currentPhaseIndex === list.length - 1;
+    const lastEp = !inFinale && phase === "trackrecord" && contestants.length <= finalCount();
+    btnEl.innerText = inFinale ? (isLastPhase ? "See Season Results" : "Proceed") : (lastEp ? "Go to the Grand Finale" : "Proceed");
+
+    /* ---------- regular episode phases ---------- */
+    if (phase === "intro") {
+        titleEl.innerText = "Meet the Queens";
+        textEl.innerHTML = `The season begins! These are the connections going in:`;
+        rels.forEach(r => addBadge(extrasEl, `${REL_ICON[r.type]} ${r.a} & ${r.b}: ${r.type}`));
+        if (formatType === 'teams') teamPairs.forEach(t => addBadge(extrasEl, `👯 Team: ${t[0]} & ${t[1]}`));
+        if (formatType === 'bracket') brBrackets.forEach((b, i) => addBadge(extrasEl, `📊 Bracket ${i + 1}: ${b.join(', ')}`));
+    }
+    else if (phase === "mini") {
+        titleEl.innerText = "Mini-Challenge!";
+        textEl.innerHTML = `In today's mini-challenge, ${epData.miniWinner} claims victory and wins a major advantage!`;
+        addBadge(extrasEl, `👑 Mini-Winner: ${epData.miniWinner}`);
+    }
+    else if (phase === "drama") {
+        titleEl.innerText = "Workroom Drama";
+        const lines = [{ html: "Back in the workroom...", wait: 1500 }, ...epData.drama.map(d => ({ ...d, wait: 2600 }))];
+        revealLines(textEl, lines, 2400);
+    }
+    else if (phase === "maxi") {
+        titleEl.innerText = "Maxi-Challenge: " + epData.challenge.name;
+        let L;
+        if (epData.challenge.type === 'lalaparuza' && epData.lalaMatches) {
+            const ms = epData.lalaMatches;
+            const lastRound = Math.max(...ms.map(m => m.round));
+            L = [
+                { html: "🎤 It's time for the <b>LaLaPaRuZa Lip Sync Smackdown</b>! Every queen will lip sync in a tournament.", wait: 3200 },
+                { html: "Win your match and you advance. Lose, and your night gets a lot harder.", wait: 2800 }
+            ];
+            let cur = 0;
+            ms.forEach(m => {
+                if (m.round !== cur) {
+                    cur = m.round;
+                    L.push({ html: `<b>${cur === lastRound ? 'Final' : 'Round ' + cur}</b>: ${m.song}`, cls: 'rel', wait: 2400 });
+                }
+                if (m.bye) L.push({ html: `<b>${m.bye}</b> gets a bye and moves on.`, wait: 1800 });
+                else L.push({ html: `<b>${m.a}</b> vs <b>${m.b}</b>... <b>${m.winner}</b> advances!`, wait: 2400 });
+            });
+            L.push({ html: `🏆 <b>${epData.winner}</b> wins the LaLaPaRuZa Lip Sync Smackdown!`, cls: 'win', wait: 3000 });
+            L.push({ html: "The judges will now deliberate...", wait: 1500 });
+        } else {
+            L = [{ html: `The queens take the main stage for <b>${epData.challenge.name}</b>.`, wait: 2200 }];
+            if (epData.challenge.desc) L.push({ html: `<i>${epData.challenge.desc}</i>`, cls: 'rel', wait: 3000 });
+            L.push({ html: "Here's how it played out...", wait: 1800 });
+            shuf(epData.activePool).forEach(q => L.push({ html: `<b>${q}</b> ${performanceComment(q)}`, wait: 2000 }));
+            L.push({ html: "The judges will now deliberate...", wait: 1500 });
+        }
+        revealLines(textEl, L, 2000);
+    }
+    else if (phase === "runway") {
+        titleEl.innerText = "Runway Presentation";
+        textEl.innerHTML = `The category is: <b>Extravaganza Eleganza</b>!<br>The queens showcase high fashion on the runway, impressing the judges.`;
+    }
+    else if (phase === "judging") {
+        titleEl.innerText = "Judging Panel";
+        if (epData.teamMode) { teamJudging(textEl); return; }
+        const L = [{ html: "Ladies, I've made my decisions.", wait: 2400 }];
+        const topOnlyEp = formatType === 'dangerous' || epData.nonElim;
+        const topNames = epData.topTwo ? [...epData.topTwo] : [epData.winner];
+        const sixQ = [...topNames, ...epData.high, ...(epData.low || []), ...(topOnlyEp ? [] : bottomList())];
+        const safeQ = shuf(epData.safe);
+        // sometimes the six queens (top + bottom) are called to the stage first
+        const sixFirst = !topOnlyEp && safeQ.length > 0 && sixQ.length === 6 && Math.random() < 0.4;
+        if (sixFirst) {
+            L.push({ html: `<b>${shuf(sixQ).join('</b>, <b>')}</b>, please step forward.`, wait: 3000 });
+            L.push({ html: `The rest of you may step back: <b>${safeQ.join('</b>, <b>')}</b>.`, wait: 2600 });
+        } else {
+            safeQ.forEach(q => L.push({ html: `<b>${q}</b>`, wait: 1500 }));
+        }
+        L.push({ html: "…", cls: 'dots', wait: 2200 });
+        // order: high queens, then the winner (or top two), then the low queen, then the bottom queens
+        shuf(epData.high).forEach(q => L.push({ html: formatType === 'dangerous'
+            ? `<b>${q}</b>, great work this week. You are safe, and no one can touch you tonight.`
+            : `<b>${q}</b>, great work this week. You are safe.`, cls: 'high', wait: 1800 }));
+        if (epData.high.length) L.push({ html: "…", cls: 'dots', wait: 2200 });
+        if (epData.topTwo) {
+            if (false) {
+            } else
+            L.push({ html: `<b>${epData.topTwo[0]}</b> and <b>${epData.topTwo[1]}</b>, condragulations! You are the top two of the week!`, cls: 'win', wait: 3000 });
+            if (formatType === 'dangerous') L.push({ html: "There is no bottom this week. You will lip sync against each other, and each of you has your own choice over the fate of the remaining queens.", wait: 3600 });
+            else if (epData.nonElim) L.push({ html: "There is no bottom this week, and no one is going home. You two will lip sync against each other.", wait: 3200 });
+            else L.push({ html: "You will lip sync against each other. The winner will use their lipstick to decide the fate of the bottom queens.", wait: 3200 });
+        } else {
+            L.push({ html: `<b>${epData.winner}</b>, condragulations! You are the winner of today's challenge!`, cls: 'win', wait: 3000 });
+        }
+        if (formatType === 'dangerous') {
+            L.push({ html: "…", cls: 'dots', wait: 2200 });
+            L.push({ html: `<b>${safeQ.join('</b>, <b>')}</b>: your fate is in the top two's hands.`, cls: 'low', wait: 2600 });
+        } else if (!topOnlyEp) {
+            L.push({ html: "…", cls: 'dots', wait: 2200 });
+            (epData.low || []).forEach(q => L.push({ html: `<b>${q}</b>, you are safe, but you're on thin ice...`, cls: 'low', wait: 2000 }));
+            if ((epData.low || []).length) L.push({ html: "…", cls: 'dots', wait: 2200 });
+            shuf(bottomList()).forEach(q => L.push({ html: `<b>${q}</b>, you are the bottom of the week.`, cls: 'bottom', wait: 2200 }));
+        }
+        revealLines(textEl, L, 1600);
+    }
+    else if (phase === "untucked") {
+        titleEl.innerText = "Untucked";
+        const lines = [{ html: "Back on the Untucked couches...", wait: 1500 }, ...epData.untucked.map(d => ({ ...d, wait: 2800 }))];
+        revealLines(textEl, lines, 2600);
+    }
+    else if (phase === "deliberation") {
+        titleEl.innerText = "Deliberation & Strategy";
+        if (formatType === 'dangerous') { dangerDeliberation(textEl); return; }
+        if (epData.nonElim) {
+            revealLines(textEl, [
+                { html: "With no bottom this week, the judges only have to decide between the top two.", wait: 3000 },
+                { html: `<b>${epData.topTwo[0]}</b> and <b>${epData.topTwo[1]}</b> prepare backstage for the lip sync.`, wait: 2600 }
+            ], 2400);
+            return;
+        }
+        if (epData.teamMode) {
+            revealLines(textEl, [
+                { html: "The judges deliberate over the two bottom teams.", wait: 3000 },
+                { html: `${teamLabel(epData.botTeams[0])} and ${teamLabel(epData.botTeams[1])} must each choose one partner to lip sync for their team's life.`, wait: 3200 },
+                { html: "If a partner is struggling, her teammate can hit the She-mergency button and tag in...", wait: 2800 }
+            ], 2400);
+            return;
+        }
+        const L = [];
+        applyAlliancePower(L);
+        if (epData.coin) {
+            const b3 = epData.bottomThree;
+            const heads = Math.random() < 0.5;
+            L.push({ html: "🪙 The host reveals the premiere twist: the <b>lucky coin</b>!", wait: 2800 });
+            L.push({ html: "The coin is flipped...", wait: 2800 });
+            if (formatType === 'strategy') {
+                const w = epData.winner;
+                if (heads) {
+                    const saved = pick(b3);
+                    const rem = b3.filter(q => q !== saved);
+                    const r = relOf(w, saved);
+                    let pv = 0.4;
+                    if (r) pv += ['rivals', 'former friends'].includes(r.type) ? 0.3 : (['besties', 'allies', 'drag sisters'].includes(r.type) ? -0.3 : 0);
+                    const veto = Math.random() < Math.max(0.1, Math.min(0.8, pv));
+                    epData.coinResult = 'heads';
+                    L.push({ html: "It lands on <b>HEADS</b>! The queens must vote to entirely save one queen from the bottom three.", wait: 3400 });
+                    L.push({ html: "The queens cast their votes...", wait: 2600 });
+                    L.push({ html: `<b>${saved}</b> is saved!`, cls: 'stay', wait: 3000 });
+                    L.push({ html: `But as the challenge winner, <b>${w}</b> has the power to veto the queens' decision.`, wait: 3400 });
+                    L.push({ html: `<b>${w}</b>: "My decision is..."`, wait: 3200 });
+                    L.push({ html: "…", cls: 'dots', wait: 2800 });
+                    if (veto) {
+                        const opp = pick(rem);
+                        epData.bottom = [saved, opp];
+                        L.push({ html: `<b>${w}</b>: "My decision is to <b>veto</b> the decision."`, cls: 'sashay', wait: 3400 });
+                        L.push({ html: `<b>${saved}</b> is automatically sent to the bottom.`, cls: 'bottom', wait: 3000 });
+                        L.push({ html: `<b>${saved}</b> picks <b>${opp}</b> as their opponent!`, wait: 2600 });
+                    } else {
+                        epData.bottom = rem;
+                        L.push({ html: `<b>${w}</b>: "My decision is to keep the decision. I won't veto."`, cls: 'stay', wait: 3200 });
+                        L.push({ html: `<b>${saved}</b> is safe. <b>${rem[0]}</b> and <b>${rem[1]}</b> will lip sync for their lives.`, wait: 2600 });
+                    }
+                } else {
+                    const chosen = pick(b3);
+                    const opp = pick(b3.filter(q => q !== chosen));
+                    epData.bottom = [chosen, opp];
+                    epData.coinResult = 'tails';
+                    L.push({ html: "It lands on <b>TAILS</b>! The challenge winner decides which queen is sent to the lip sync, and the queens vote for the opponent.", wait: 3600 });
+                    L.push({ html: `<b>${w}</b>: "The queen I chose is..."`, wait: 3200 });
+                    L.push({ html: "…", cls: 'dots', wait: 2800 });
+                    L.push({ html: `<b>${chosen}</b>.`, cls: 'bottom', wait: 3000 });
+                    L.push({ html: `The queens now vote on who will face <b>${chosen}</b>...`, wait: 3000 });
+                    L.push({ html: `<b>${opp}</b> is voted as the opponent!`, cls: 'bottom', wait: 2600 });
+                }
+            } else if (heads) {
+                const saved = pick(b3);
+                const rem = b3.filter(q => q !== saved);
+                epData.bottom = rem;
+                epData.coinResult = 'heads';
+                L.push({ html: "It lands on <b>HEADS</b>! The queens must vote to entirely save one queen from the bottom three.", wait: 3400 });
+                L.push({ html: "The queens cast their votes...", wait: 2600 });
+                L.push({ html: `<b>${saved}</b> is saved!`, cls: 'stay', wait: 3000 });
+                L.push({ html: `<b>${rem[0]}</b> and <b>${rem[1]}</b> will lip sync for their lives.`, wait: 2400 });
+            } else {
+                const sent = pick(b3);
+                const opp = pick(b3.filter(q => q !== sent));
+                epData.bottom = [sent, opp];
+                epData.coinResult = 'tails';
+                L.push({ html: "It lands on <b>TAILS</b>! The queens must vote to send one of the bottom three straight into the lip sync, and the judges will choose the opponent.", wait: 3600 });
+                L.push({ html: "The queens cast their votes...", wait: 2600 });
+                L.push({ html: `<b>${sent}</b> is sent directly to the lip sync!`, cls: 'bottom', wait: 3000 });
+                L.push({ html: `The judges select <b>${opp}</b> as the opponent.`, wait: 2600 });
+            }
+        } else if (epData.lalaSave) {
+            const b3 = epData.bottomThree;
+            const w = epData.winner;
+            const panel = shuf([w, ...shuf(epData.high).slice(0, 3)]);
+            const picks = panel.map(t => ({ t, q: lalaSavePick(t, b3) }));
+            const votes = {};
+            b3.forEach(q => { votes[q] = 0; });
+            picks.forEach(pk => { votes[pk.q]++; });
+            const max = Math.max(...Object.values(votes));
+            const leaders = b3.filter(q => votes[q] === max);
+            const winnerPick = picks.find(pk => pk.t === w).q;
+            const saved = leaders.length === 1 ? leaders[0] : (leaders.includes(winnerPick) ? winnerPick : pick(leaders));
+            const rem = b3.filter(q => q !== saved);
+            epData.bottom = rem;
+            epData.lalaSaved = saved;
+
+            L.push({ html: `The LaLaPaRuZa is over, and <b>${w}</b> is the winner. The bottom three are <b>${b3.join('</b>, <b>')}</b>.`, wait: 3400 });
+            L.push({ html: `The winner and the high queens (<b>${panel.join('</b>, <b>')}</b>) will deliberate on who to save from the bottom three.`, wait: 3400 });
+            picks.forEach(pk => L.push({ html: `<b>${pk.t}</b>: "I would save <b>${pk.q}</b>${lalaSavePhrase(pk.t, pk.q)}."`, wait: 3000 }));
+            L.push(leaders.length > 1 || Object.values(votes).filter(v => v > 0).length > 1
+                ? { html: "The panel can't fully agree, and the debate gets heated.", cls: 'rel', wait: 3000 }
+                : { html: "The panel is in agreement.", cls: 'rel', wait: 2600 });
+            L.push({ html: "After a long discussion, they make their decision.", wait: 2800 });
+            L.push({ html: "…", cls: 'dots', wait: 2400 });
+            L.push({ html: `<b>${saved}</b> is saved!`, cls: 'stay', wait: 3000 });
+            L.push({ html: `<b>${rem[0]}</b> and <b>${rem[1]}</b> will lip sync for their lives.`, wait: 2600 });
+        } else if (formatType === 'strategy') {
+            const chosen = pick(epData.bottomThree);
+            const opponent = pick(epData.bottomThree.filter(q => q !== chosen));
+            epData.strategyMatchup = [chosen, opponent];
+            epData.bottom = [chosen, opponent];
+            L.push({ html: `As challenge winner, <b>${epData.winner}</b> chooses <b>${chosen}</b> to face the lip sync.`, wait: 2800 });
+            L.push({ html: `<b>${chosen}</b> then selects <b>${opponent}</b> as their opponent!`, wait: 2000 });
+        } else if (epData.threeWay && formatType !== 'legacy') {
+            L.push({ html: `🔥 A twist! The bottom three, ${nameList(epData.bottom)}, will ALL lip sync for their lives.`, wait: 3200 });
+            L.push({ html: epData.elimMode === 'three2'
+                ? "Tonight, only one of you will survive. The other two will be going home."
+                : "Tonight, two of you will stay, and one of you will sashay away.", cls: 'bottom', wait: 3000 });
+        } else if (formatType === 'assassin') {
+            L.push({ html: `The bottom queens, ${nameList(epData.bottom)}, wait backstage. Tonight the winner faces a surprise Assassin, and the fate of the bottom queens rides on the result.`, wait: 2800 });
+        } else if (formatType !== 'legacy') {
+            L.push({ html: `The bottom queens prepare backstage for the Lip Sync For Your Life. Tension is at an all-time high.`, wait: 2000 });
+        }
+        if (formatType === 'legacy') {
+            L.push({ html: `The top two will lip sync against each other. The winner will decide the fate of the bottom queens: ${nameList(epData.bottom)}. Only one of them can be eliminated.`, wait: 2600 });
+            L.push({ html: "Nobody knows whose name is on the lipstick yet...", wait: 2200 });
+        }
+        revealLines(textEl, L, 2400);
+    }
+    else if (phase === "lipsync") {
+        titleEl.innerText = "The Lip Sync Smackdown";
+        if (epData.teamMode) {
+            const [b1, b2] = epData.botTeams, L2 = [
+                { html: epData.teamNonElim ? "Tonight no team goes home, but fight like it's for your life." : "For your team's life, good luck, and don't f*** it up.", wait: 2600 },
+                { html: `The lip sync song is: <b>${epData.lipSyncSong}</b>.`, wait: 2600 },
+                { html: `<b>${epData.tReps[0]}</b> steps up for ${teamLabel(b1)}, and <b>${epData.tReps[1]}</b> steps up for ${teamLabel(b2)}.`, wait: 2800 }
+            ];
+            epData.tTag.forEach((tg, i) => { if (tg) L2.push({ html: `🚨 SHE-MERGENCY! <b>${epData.tPerf[i]}</b> hits the button and tags in for <b>${epData.tReps[i]}</b>!`, cls: 'sashay', wait: 3200 }); });
+            L2.push({ html: `<b>${epData.tPerf[0]}</b> and <b>${epData.tPerf[1]}</b> take the stage...`, wait: 2600 });
+            L2.push({ html: "Both queens deliver an unforgettable performance!", wait: 2000 });
+            revealLines(textEl, L2, 2400);
+        } else if (epData.nonElim && formatType !== 'dangerous') {
+            const t = epData.topTwo;
+            revealLines(textEl, [
+                { html: "For the win, good luck, and don't f*** it up.", wait: 2600 },
+                { html: `The lip sync song is: <b>${epData.lipSyncSong}</b>.`, wait: 2600 },
+                { html: `<b>${t[0]}</b> and <b>${t[1]}</b> take the stage...`, wait: 2600 },
+                { html: "Both queens deliver an unforgettable performance!", wait: 2000 }
+            ], 2400);
+        } else if (formatType === 'assassin' && epData.assassin) {
+            revealLines(textEl, [
+                { html: `${epData.winner}, as this week's winner, you will lip sync... but not against one of your sisters.`, wait: 3000 },
+                { html: "A hush falls over the room as the doors open...", wait: 2600 },
+                { html: `🗡️ A surprise Assassin appears: <b>${epData.assassin}</b>!`, cls: 'sashay', wait: 3400 },
+                { html: `The lip sync song is: <b>${epData.lipSyncSong}</b>.`, wait: 2600 },
+                { html: `<b>${epData.winner}</b> and <b>${epData.assassin}</b> take the stage...`, wait: 2600 },
+                { html: `${nameList(epData.bottom)} watch nervously from the side...`, cls: 'low', wait: 2600 },
+                { html: "Both queens deliver an unforgettable performance!", wait: 2000 }
+            ], 2400);
+        } else if (formatType === 'legacy' || formatType === 'dangerous') {
+            const t = epData.topTwo;
+            const watchers = formatType === 'dangerous' ? epData.safe : epData.bottom;
+            revealLines(textEl, [
+                { html: formatType === 'dangerous'
+                    ? "For the win, and for the power to decide the fate of your sisters, good luck, and don't f*** it up."
+                    : "For the win, and for the power of the lipstick, good luck, and don't f*** it up.", wait: 2800 },
+                { html: `The lip sync song is: <b>${epData.lipSyncSong}</b>.`, wait: 2600 },
+                { html: `<b>${t[0]}</b> and <b>${t[1]}</b> take the stage...`, wait: 2600 },
+                { html: `${nameList(watchers)} watch nervously from the side...`, cls: 'low', wait: 2600 },
+                { html: "Both queens deliver an unforgettable performance!", wait: 2000 }
+            ], 2400);
+        } else {
+            const b = epData.bottom;
+            revealLines(textEl, [
+                { html: "For your life, good luck, and don't f*** it up.", wait: 2600 },
+                { html: `The lip sync song is: <b>${epData.lipSyncSong}</b>.`, wait: 2600 },
+                { html: b.length === 3 ? `A three-way lip sync! ${nameList(b)} take the stage...` : `<b>${b[0]}</b> and <b>${b[1]}</b> take the stage...`, wait: 2600 },
+                { html: "Both queens deliver an unforgettable performance!", wait: 2000 }
+            ], 2400);
+        }
+    }
+    else if (phase === "elimination") {
+        titleEl.innerText = "Shantay You Stay... or Sashay Away";
+        if (formatType === 'dangerous') { dangerElimination(textEl); return; }
+        if (epData.teamMode) { teamElimination(textEl); return; }
+        if (epData.nonElim) {
+            const [t1, t2] = epData.topTwo;
+            epData.eliminated = null;
+            epData.eliminatedAll = [];
+            recordLipSync({ a: t1, b: t2, song: epData.lipSyncSong, winner: epData.coWinner ? null : epData.winner, out: null, double: !!epData.coWinner });
+            seasonHistory.push({ ...epData });
+            const starLines = [];
+            if (formatType === 'stars') {
+                const dbl = currentEpisode === dblStarEp;
+                const rec = seasonHistory[seasonHistory.length - 1];
+                const aw = {};
+                const add = (q, n) => { aw[q] = (aw[q] || 0) + n; starCount[q] = (starCount[q] || 0) + n; };
+                const denied = epData.starDenied;
+                const earners = [t1, t2].filter(q => q !== denied);
+                earners.forEach(q => add(q, dbl ? 2 : 1));
+                const who = earners.length === 2 ? `<b>${t1}</b> and <b>${t2}</b> each earn` : `<b>${earners[0]}</b> earns`;
+                starLines.push(dbl
+                    ? { html: `🌟 DOUBLE STAR EPISODE! ${who} <b>2 stars</b>, win the lip sync or not!`, cls: 'win', wait: 3200 }
+                    : { html: `⭐ ${who} a star, win or lose!`, cls: 'win', wait: 2800 });
+                if (earners.length < 2) starLines.push({ html: `🚫 <b>${denied}</b> is in the top two, but she was blocked last week, so she earns no star.`, cls: 'bottom', wait: 3200 });
+                if (dbl) {
+                    const gifted = [];
+                    earners.forEach(g => {
+                        let pool = contestants.filter(q => q !== t1 && q !== t2 && !gifted.includes(q));
+                        if (!pool.length) pool = contestants.filter(q => q !== g);
+                        const allies = pool.filter(q => { const r = relOf(g, q); return r && ['besties', 'allies', 'drag sisters'].includes(r.type); });
+                        const low = pool.slice().sort((x, y) => (starCount[x] || 0) - (starCount[y] || 0))[0];
+                        const to = (allies.length && Math.random() < 0.5) ? pick(allies) : low;
+                        add(g, -1); add(to, 1); gifted.push(to);
+                        starLines.push({ html: `🎁 <b>${g}</b> gifts one of their stars to <b>${to}</b>!`, cls: 'rel', wait: 3000 });
+                    });
+                    rec.starGift = gifted;
+                }
+                rec.starAward = aw;
+                const lsW = epData.winner;
+                if (currentEpisode < starEps) {
+                    // the winner can block anyone except the top two
+                    const cands = contestants.filter(q => q !== lsW && q !== t1 && q !== t2);
+                    const rv = cands.filter(q => { const r = relOf(lsW, q); return r && ['rivals', 'former friends'].includes(r.type); });
+                    const lead = cands.slice().sort((x, y) => (starCount[y] || 0) - (starCount[x] || 0))[0];
+                    blockedQueen = (rv.length && Math.random() < 0.5) ? pick(rv) : (Math.random() < 0.6 ? lead : pick(cands));
+                    rec.starBlocked = blockedQueen;   // shows as BLOCK in this episode's track record
+                    starLines.push({ html: `<b>${lsW}</b> won the lip sync and may block one queen from earning a star next week. You choose... <b>${blockedQueen}</b>!`, cls: 'bottom', wait: 3400 });
+                }
+                const top = Object.entries(starCount).sort((x, y) => y[1] - x[1]).slice(0, 5).map(e => `${e[0]} (${e[1]})`).join(', ');
+                starLines.push({ html: `⭐ Star leaders: ${top}`, cls: 'rel', wait: 2800 });
+            }
+            const lsLines = epData.coWinner
+                ? [{ html: "…", cls: 'dots', wait: 3000 }, { html: `Both <b>${t1}</b> and <b>${t2}</b> win the lip sync and the challenge! A double win!`, cls: 'win', wait: 3400 }, ...lsReview(t1, t2)]
+                : [{ html: "…", cls: 'dots', wait: 3000 }, { html: `The winner of tonight's lip sync is... <b>${epData.winner}</b>! You are the winner of this week's challenge!`, cls: 'win', wait: 3400 }, ...lsReview(epData.winner, epData.winner === t1 ? t2 : t1)];
+            revealLines(textEl, [
+                { html: "The lip sync is over, and the judges have made their call...", wait: 3000 },
+                ...lsLines,
+                { html: `<b>${t1}</b> and <b>${t2}</b>, you are both safe.`, cls: 'stay', wait: 3000 },
+                { html: "It's a non-elimination episode. No one is going home tonight!", wait: 1500 },
+                ...starLines
+            ], 2800);
+            return;
+        }
+        if (formatType === 'assassin' && epData.assassin) {
+            const W = epData.winner, A = epData.assassin, sy = epData.bottom;
+            const wWins = Math.random() < Math.min(0.7, 0.4 + ppeOf(W) * 0.04);
+            const LA = [{ html: "The lip sync is over, and the judges have made their call...", wait: 3000 }, { html: "…", cls: 'dots', wait: 3000 }];
+            let out;
+            if (wWins) {
+                const lip = chooseLipstick(W, sy);
+                out = lip.name;
+                LA.push({ html: `The winner of tonight's lip sync is... <b>${W}</b>! The Assassin has been defeated.`, cls: 'win', wait: 3400 });
+                LA.push(...lsReview(W, A));
+                LA.push({ html: `<b>${W}</b>, you now choose which of the bottom queens goes home.`, wait: 3000 });
+                LA.push({ html: `<b>${W}</b>: "The queen I'm eliminating is..."`, wait: 3200 });
+                LA.push({ html: "…", cls: 'dots', wait: 2800 });
+                LA.push({ html: `<b>${out}</b>.`, cls: 'sashay', wait: 3200 });
+                LA.push({ html: `"${lip.reason}"`, cls: 'rel', wait: 3000 });
+            } else {
+                const voters = contestants.filter(q => !sy.includes(q));
+                const votes = {}; sy.forEach(q => { votes[q] = 0; });
+                voters.forEach(v => {
+                    const bad = sy.filter(q => { const r = relOf(v, q); return r && ['rivals', 'former friends'].includes(r.type); });
+                    const good = sy.filter(q => { const r = relOf(v, q); return r && ['besties', 'allies', 'drag sisters'].includes(r.type); });
+                    let c;
+                    if (Math.random() < 0.3) c = pick(sy);
+                    else if (bad.length === 1) c = bad[0];
+                    else if (good.length === 1) c = sy.find(q => q !== good[0]);
+                    else c = ppeOf(sy[0]) <= ppeOf(sy[1]) ? sy[0] : sy[1];
+                    votes[c]++;
+                });
+                out = votes[sy[0]] === votes[sy[1]] ? (ppeOf(sy[0]) === ppeOf(sy[1]) ? pick(sy) : (ppeOf(sy[0]) < ppeOf(sy[1]) ? sy[0] : sy[1])) : (votes[sy[0]] > votes[sy[1]] ? sy[0] : sy[1]);
+                LA.push({ html: `The winner of tonight's lip sync is... <b>${A}</b>! The Assassin claims another victim.`, cls: 'sashay', wait: 3400 });
+                LA.push(...lsReview(A, W));
+                LA.push({ html: `<b>${W}</b> has lost, so the remaining queens must cast a secret vote on who goes home.`, wait: 3200 });
+                LA.push({ html: "The queens cast their secret votes...", wait: 2800 });
+                LA.push({ html: `<b>${sy[0]}</b>: ${votes[sy[0]]} vote${votes[sy[0]] === 1 ? '' : 's'}, <b>${sy[1]}</b>: ${votes[sy[1]]} vote${votes[sy[1]] === 1 ? '' : 's'}.`, cls: 'bottom', wait: 3400 });
+                LA.push({ html: "…", cls: 'dots', wait: 2400 });
+            }
+            const kept = sy.find(q => q !== out);
+            contestants = contestants.filter(c => c !== out);
+            eliminatedQueens.push({ name: out, episode: currentEpisode, order: eliminatedQueens.length });
+            epData.eliminated = out;
+            epData.eliminatedAll = [out];
+            seasonHistory.push({ ...epData });
+            LA.push({ html: `<b>${kept}</b>, shantay you stay.`, cls: 'stay', wait: 3000 });
+            LA.push({ html: `<b>${out}</b>, sashay away...`, cls: 'sashay', wait: 1500 });
+            revealLines(textEl, LA, 2800);
+            return;
+        }
+        if (epData.threeWay && formatType !== 'legacy') {
+            const sy3 = epData.bottom;
+            const ranked = sy3.slice().sort((x, y) => ppeOf(x) - ppeOf(y));
+            const two = epData.elimMode === 'three2';
+            let out3;
+            if (two) out3 = Math.random() < 0.5 ? ranked.slice(0, 2) : shuf(sy3).slice(0, 2);
+            else out3 = [Math.random() < 0.45 ? ranked[0] : pick(sy3)];
+            const kept = sy3.filter(q => !out3.includes(q));
+            recordLipSync({ a: kept[0], b: out3[0], song: epData.lipSyncSong, winner: kept[0], out: out3[0], double: two });
+            out3.forEach(n => {
+                contestants = contestants.filter(c => c !== n);
+                eliminatedQueens.push({ name: n, episode: currentEpisode, order: eliminatedQueens.length });
+            });
+            epData.eliminated = out3[0];
+            epData.eliminatedAll = out3;
+            seasonHistory.push({ ...epData });
+            const L3 = [
+                { html: "Ladies, I've made my decision.", wait: 2800 },
+                { html: "Three queens gave it everything, but not all of you will survive.", wait: 3000 },
+                { html: "…", cls: 'dots', wait: 3200 }
+            ];
+            if (two) {
+                L3.push({ html: `<b>${kept[0]}</b>, shantay you stay.`, cls: 'stay', wait: 3800 });
+                L3.push({ html: "…", cls: 'dots', wait: 2400 });
+                L3.push({ html: `<b>${out3[0]}</b> and <b>${out3[1]}</b>, I'm sorry my dears. Sashay away...`, cls: 'sashay', wait: 3200 });
+                L3.push({ html: "A double elimination!", wait: 1500 });
+            } else {
+                kept.forEach(q => { L3.push({ html: `<b>${q}</b>, shantay you stay.`, cls: 'stay', wait: 3400 }); });
+                L3.push({ html: "…", cls: 'dots', wait: 2400 });
+                L3.push({ html: `<b>${out3[0]}</b>, sashay away...`, cls: 'sashay', wait: 2800 });
+            }
+            revealLines(textEl, L3, 2800);
+            return;
+        }
+        const legacy = formatType === 'legacy';
+        const sy = epData.bottom;
+        let mode = epData.elimMode || 'single';
+
+        // Lip Sync For Your Legacy: the top two lip sync, the winner picks the lipstick
+        let lsWinner = null, lsLoser = null, lipstick = null;
+        if (legacy) {
+            const [t1, t2] = epData.topTwo;
+            const p1 = ppeOf(t1), p2 = ppeOf(t2);
+            lsWinner = Math.random() < 0.5 ? (p1 >= p2 ? t1 : t2) : pick([t1, t2]);
+            lsLoser = lsWinner === t1 ? t2 : t1;
+            epData.winner = lsWinner;
+            if (mode === 'single') lipstick = chooseLipstick(lsWinner, sy);
+        }
+
+        let elimList = [], tieLines = [];
+        if (mode === 'single') {
+            if (legacy) {
+                elimList = [lipstick.name];
+            } else {
+                const pa = ppeOf(sy[0]), pb = ppeOf(sy[1]);
+                let eliminated;
+                if (Math.random() < 0.35) {
+                    tieLines.push({ html: `The lip syncs were evenly matched, so the judges based their decision on the track records: <b>${sy[0]}</b> (${pa.toFixed(2)} PPE) vs <b>${sy[1]}</b> (${pb.toFixed(2)} PPE).`, cls: 'rel', wait: 3600 });
+                    eliminated = pa === pb ? pick(sy) : (pa < pb ? sy[0] : sy[1]);
+                } else {
+                    eliminated = pick(sy);
+                }
+                elimList = [eliminated];
+            }
+        } else if (mode === 'sashay2') {
+            elimList = shuf(sy);
+        }
+
+        if (legacy) {
+            recordLipSync({ a: epData.topTwo[0], b: epData.topTwo[1], song: epData.lipSyncSong, winner: lsWinner, out: null, lipstick: true });
+            if (mode === 'single') {
+                const rl = relOf(lsWinner, lipstick.name);
+                seasonMoments.push({ kind: 'lipstick', ep: currentEpisode, sc: Math.random() * 2 + (rl && ['rivals','former friends','besties','allies'].includes(rl.type) ? 3 : 0), w: lsWinner, chosen: [lipstick.name], reason: lipstick.reason });
+            }
+        } else {
+            const fin = sy.length === 2 ? sy : [];
+            if (fin.length === 2) recordLipSync({ a: fin[0], b: fin[1], song: epData.lipSyncSong, winner: elimList.length === 1 ? fin.find(q => q !== elimList[0]) : null, out: elimList[0] || null, double: mode === 'sashay2', upset: elimList.length === 1 && ppeOf(elimList[0]) > ppeOf(fin.find(q => q !== elimList[0])) + 0.5 });
+        }
+        elimList.forEach(n => {
+            contestants = contestants.filter(c => c !== n);
+            eliminatedQueens.push({ name: n, episode: currentEpisode, order: eliminatedQueens.length });
+        });
+        epData.eliminated = elimList[0] || null;
+        epData.eliminatedAll = elimList;
+        seasonHistory.push({ ...epData });
+
+        const L = [];
+        if (legacy) {
+            L.push({ html: "The lip sync is over, and the judges have made their call...", wait: 3000 });
+            L.push({ html: "…", cls: 'dots', wait: 3000 });
+            L.push({ html: `The winner of tonight's lip sync is... <b>${lsWinner}</b>!`, cls: 'win', wait: 3400 });
+            { const lsLoser = (epData.topTwo || []).find(q => q !== lsWinner); if (lsLoser) L.push(...lsReview(lsWinner, lsLoser)); }
+            L.push({ html: `<b>${lsWinner}</b>, you now hold the power. It's time to reveal your lipstick.`, wait: 3200 });
+            if (mode === 'single') {
+                const savedList = sy.filter(q => q !== lipstick.name);
+                L.push({ html: pick([`The room goes completely silent as <b>${lsWinner}</b> looks at the two lipsticks.`, `<b>${lsWinner}</b>'s hand trembles over the lipsticks. Nobody breathes.`, `<b>${lsWinner}</b> closes their eyes for a moment before turning to the lipsticks.`]), cls: 'rel', wait: 3200 });
+                L.push({ html: `<b>${lsWinner}</b>: \"The lipstick I've chosen is...\"`, wait: 3600 });
+                L.push({ html: "…", cls: 'dots', wait: 2800 });
+                L.push({ html: `<b>${lipstick.name}</b>.`, cls: 'sashay', wait: 3400 });
+                L.push({ html: `\"${lipstick.reason}\"`, cls: 'rel', wait: 3200 });
+                L.push({ html: pick([`<b>${lipstick.name}</b> takes a shaky breath and nods, fighting back tears.`, `<b>${lipstick.name}</b> stares at the floor, stunned. The other queens gasp.`, `<b>${lipstick.name}</b> blinks hard and manages a small, proud smile.`]), cls: 'low', wait: 3000 });
+                L.push({ html: `${nameList(savedList)}, shantay you stay.`, cls: 'stay', wait: 3000 });
+                L.push({ html: `<b>${lsLoser}</b>, you are safe too.`, wait: 2400 });
+                L.push({ html: `<b>${lipstick.name}</b>, sashay away...`, cls: 'sashay', wait: 1500 });
+            } else if (mode === 'sashay2') {
+                L.push({ html: `<b>${lsWinner}</b>: "The lipstick I've chosen is..."`, wait: 3400 });
+                L.push({ html: "…", cls: 'dots', wait: 2800 });
+                L.push({ html: "Both of them. I'm sorry.", cls: 'sashay', wait: 3400 });
+                L.push({ html: `<b>${elimList[0]}</b>, sashay away...`, cls: 'sashay', wait: 3400 });
+                L.push({ html: `<b>${elimList[1]}</b>, sashay away...`, cls: 'sashay', wait: 2000 });
+                L.push({ html: "A double elimination!", wait: 1500 });
+            } else {
+                L.push({ html: `<b>${lsWinner}</b>: "The lipstick I've chosen is..."`, wait: 3400 });
+                L.push({ html: "…", cls: 'dots', wait: 2800 });
+                L.push({ html: "None. I'm not sending anyone home tonight.", cls: 'stay', wait: 3400 });
+                L.push({ html: `<b>${sy[0]}</b> and <b>${sy[1]}</b>, shantay, you both stay.`, cls: 'stay', wait: 3000 });
+                L.push({ html: epData.nonElim ? "It's a non-elimination episode. No one is going home tonight!" : "Tonight, no one is going home!", wait: 1500 });
+            }
+        } else {
+            if (mode !== 'single') {
+                L.push({ html: "Ladies, I've made my decision.", wait: 2800 });
+                L.push({ html: "This is a very difficult decision.", wait: 3000 });
+                L.push({ html: "…", cls: 'dots', wait: 3500 });
+            }
+            if (mode === 'single') {
+                const saved = sy.find(q => q !== elimList[0]);
+                L.push(...lsReview(saved, elimList[0]));
+                L.push(...verdictLines([saved], [elimList[0]]));
+                L.push(...tieLines);
+            } else if (mode === 'sashay2') {
+                L.push({ html: `<b>${elimList[0]}</b>, sashay away...`, cls: 'sashay', wait: 3600 });
+                L.push({ html: `<b>${elimList[1]}</b>, sashay away...`, cls: 'sashay', wait: 2400 });
+                L.push({ html: "A double elimination!", wait: 1500 });
+            } else if (mode === 'shantay2') {
+                L.push({ html: `<b>${sy[0]}</b>, shantay you stay.`, cls: 'stay', wait: 3600 });
+                L.push({ html: `<b>${sy[1]}</b>, shantay you stay.`, cls: 'stay', wait: 2800 });
+                L.push({ html: "Tonight, no one is going home!", wait: 1500 });
+            } else {
+                L.push({ html: `<b>${sy[0]}</b> and <b>${sy[1]}</b>, shantay, you both stay.`, cls: 'stay', wait: 3600 });
+                L.push({ html: "It's a non-elimination episode. No one is going home tonight!", wait: 1500 });
+            }
+        }
+        revealLines(textEl, L, 2800);
+    }
+    else if (phase === "brpoints") {
+        titleEl.innerText = `Bracket ${epData.brIdx + 1}: Points`;
+        const pool = epData.activePool;
+        const L = [
+            { html: `<b>${epData.winner}</b> wins the challenge and earns <b>3 points</b>!`, cls: 'win', wait: 2800 },
+            { html: `<b>${epData.winner}</b> also gifts <b>2 points</b> to <b>${epData.brGift}</b>!`, cls: 'rel', wait: 3000 },
+            { html: "📊 Bracket standings: " + pool.slice().sort((a, b) => (brPts[b] || 0) - (brPts[a] || 0)).map(q => `${q} (${brPts[q] || 0})`).join(', '), wait: 3200 }
+        ];
+        if (epData.brLast) {
+            L.push({ html: "…", cls: 'dots', wait: 2400 });
+            L.push({ html: `${nameList(epData.brAdvance)}, you finish at the top of the bracket and advance to the merged competition!`, cls: 'stay', wait: 3400 });
+            if (epData.tallyOut.length) L.push({ html: `${nameList(epData.tallyOut)}, your time in the bracket is over. Sashay away...`, cls: 'sashay', wait: 3200 });
+        }
+        revealLines(textEl, L, 2400);
+    }
+    else if (phase === "startally") {
+        titleEl.innerText = "The Star Count";
+        const L = [
+            { html: "The season of stars has come to an end. It's time to count them up.", wait: 3000 },
+            ...epData.tally.map(t => ({ html: `⭐ <b>${t.q}</b>: ${t.s} star${t.s === 1 ? '' : 's'}`, wait: 1800 })),
+            { html: "…", cls: 'dots', wait: 2800 },
+            { html: `${nameList(epData.tallyKeep)}, you earned the most stars and advance to the Lip Sync Smackdown finale!`, cls: 'stay', wait: 3400 }
+        ];
+        if (epData.lad2) {
+            L.push({ html: "The queens who just missed the finale will fight in a consolation Lip Sync Smackdown. The weakest lip sync first, and the winner climbs the ladder.", wait: 3400 });
+            epData.lad2.rounds.forEach((r, i) => L.push({ html: `Round ${i + 1}: <b>${r.a}</b> vs <b>${r.b}</b>... <b>${r.winner}</b> wins and moves on. <b>${r.loser}</b> is out.`, cls: 'rel', wait: 3000 }));
+            L.push({ html: `<b>${epData.lad2.order[0]}</b> wins the consolation Smackdown!`, cls: 'win', wait: 3000 });
+        }
+        if (epData.others.length) L.push({ html: `${nameList(epData.others)}, you didn't collect enough stars. Sashay away...`, cls: 'sashay', wait: 3200 });
+        revealLines(textEl, L, 2400);
+    }
+    else if (phase === "trackrecord") {
+        titleEl.innerText = "Track Record After Episode " + currentEpisode;
+        textEl.innerHTML = `Here is how the season looks so far. The queens are ranked by their track record.`;
+        document.getElementById('sim-track').style.display = 'block';
+        renderTrackHTML(buildTrackData(currentState(), false), document.getElementById('sim-head'), document.getElementById('sim-body'));
+    }
+
+    /* ---------- finale phases ---------- */
+    else if (phase === "fin_intro") {
+        titleEl.innerText = "The Grand Finale";
+        const L = [{ html: "Welcome to the grand finale of the season!", wait: 2600 }, { html: "Our finalists are...", wait: 2200 }];
+        finale.intro.forEach(n => {
+            const wins = seasonHistory.filter(h => h.winner === n || h.coWinner === n || (!h.winner && h.topTwo && h.topTwo.includes(n))).length;
+            L.push({ html: `👑 <b>${n}</b> — ${wins} ${formatType === 'dangerous' ? 'top-two finish' + (wins === 1 ? '' : 'es') : 'challenge win' + (wins === 1 ? '' : 's')}`, wait: 2200 });
+        });
+        const pairs = [];
+        for (let i = 0; i < finale.order.length; i++)
+            for (let j = i + 1; j < finale.order.length; j++) {
+                const r = relOf(finale.order[i], finale.order[j]);
+                if (r) pairs.push(`${REL_ICON[r.type]} ${r.a} and ${r.b} came in as ${r.type}. Only one can take the crown.`);
+            }
+        pairs.slice(0, 2).forEach(p => L.push({ html: p, cls: 'rel', wait: 2600 }));
+        if (finale.bracket) L.push({ html: "This season's finale will be decided in a series of <b>lip sync battles</b>!", wait: 2800 });
+        revealLines(textEl, L, 2200);
+    }
+    else if (phase === "fin_talent") {
+        titleEl.innerText = "Finale Challenge: " + finale.talent;
+        const L = [{ html: `The finalists take the stage one by one for the <b>${finale.talent}</b>.`, wait: 2600 }];
+        shuf(finale.order).forEach(n => L.push({ html: `<b>${n}</b> ${finaleComment(n, 'talent')}`, wait: 3200 }));
+        revealLines(textEl, L, 2800);
+    }
+    else if (phase === "fin_runway") {
+        titleEl.innerText = "Finale Runway: Crown of Jewels";
+        const L = [{ html: "Now for the final runway. The category is <b>Crown of Jewels</b>.", wait: 2600 }];
+        shuf(finale.order).forEach(n => L.push({ html: `<b>${n}</b> ${finaleComment(n, 'runway')}`, wait: 3200 }));
+        revealLines(textEl, L, 2800);
+    }
+    else if (phase === "fin_lipsync") {
+        titleEl.innerText = "Final Cuts & The Final Lip Sync";
+        if (finale.ladder) {
+            titleEl.innerText = "The Finale Lip Sync Smackdown";
+            const LL = [{ html: "It's time for the Lip Sync Smackdown! The queens with the fewest stars lip sync first, and the winner climbs the ladder to face the next queen.", wait: 3400 }];
+            finale.ladder.forEach((r, i) => {
+                LL.push({ html: `Round ${i + 1}: <b>${r.a}</b> vs <b>${r.b}</b>, to <b>${r.song}</b>.`, wait: 2800 });
+                LL.push({ html: "…", cls: 'dots', wait: 2400 });
+                LL.push({ html: i === finale.ladder.length - 1 ? `<b>${r.winner}</b> wins the final round and conquers the ladder!` : `<b>${r.winner}</b> wins round ${i + 1} and moves on. <b>${r.loser}</b> is out of the running.`, cls: i === finale.ladder.length - 1 ? 'win' : 'rel', wait: 3000 });
+            });
+            revealLines(textEl, LL, 2600);
+            return;
+        }
+        if (finale.bracket) { titleEl.innerText = "The Finale Lip Sync Battles"; finaleBracketLipsync(textEl); return; }
+        const o = finale.order;
+        const L = [{ html: "The judges deliberate...", wait: 2600 }, { html: "…", cls: 'dots', wait: 2800 }];
+        const cuts = o.slice(2).reverse();
+        cuts.forEach((n, i) => {
+            const place = o.indexOf(n) + 1;
+            L.push({ html: `<b>${n}</b>, you have placed ${place}${getOrdinalSuffix(place)}. Thank you for everything you gave this season. Sashay away...`, cls: 'sashay', wait: 3800 });
+            if (i < cuts.length - 1) L.push({ html: "…", cls: 'dots', wait: 1800 });
+        });
+        L.push({ html: "The final two will lip sync for the crown!", wait: 2800 });
+        L.push({ html: `The song is: <b>${finale.song}</b>.`, wait: 2600 });
+        L.push({ html: `<b>${o[0]}</b> and <b>${o[1]}</b> take the stage...`, wait: 3000 });
+        L.push({ html: "Two queens, one crown, no room for mistakes.", wait: 2400 });
+        revealLines(textEl, L, 2600);
+    }
+    else if (phase === "fin_crown") {
+        titleEl.innerText = "The Crowning";
+        const o = finale.order;
+        const L = [{ html: "Ladies, I've made my decision.", wait: 3000 }];
+        L.push({ html: "The winner of this season of Drag Race is...", wait: 3600 });
+        L.push({ html: "…", cls: 'dots', wait: 4000 });
+        L.push({ html: `👑 <b>${o[0]}</b>, you are the winner of this season! 👑`, cls: 'winner-line', wait: 4000 });
+        L.push({ html: "…", cls: 'dots', wait: 3000 });
+        L.push({ html: `<b>${o[1]}</b>, shantay you stay. You are the runner-up.`, cls: 'stay', wait: 3200 });
+        if (finale.tie) L.push({ html: `The final lip sync was too close to call, so the judges based the crown on the track records: <b>${o[0]}</b> (${finale.ppe[0].toFixed(2)} PPE) vs <b>${o[1]}</b> (${finale.ppe[1].toFixed(2)} PPE).`, cls: 'rel', wait: 2000 });
+        revealLines(textEl, L, 3000);
+    }
+    else if (phase === "fin_memorable") {
+        titleEl.innerText = "Memorable Moments of the Season";
+        const ls = seasonMoments.filter(m => m.kind === 'lipsync').sort((x, y) => y.sc - x.sc)[0];
+        const fg = seasonMoments.filter(m => m.kind === 'fight').sort((x, y) => y.sc - x.sc)[0];
+        const lp = seasonMoments.filter(m => m.kind === 'lipstick').sort((x, y) => y.sc - x.sc)[0];
+        const L = [{ html: "Before we say goodbye, let's look back at the moments you'll never forget...", wait: 2800 }];
+        if (ls) {
+            const place = ls.ep === 'Finale' ? 'the Grand Finale' : 'Episode ' + ls.ep;
+            L.push({ html: `🎤 <b>Lip Sync of the Season</b>: <b>${ls.a}</b> vs <b>${ls.b}</b> in ${place}, to <i>${ls.song}</i>.`, cls: 'win', wait: 3600 });
+            L.push({ html: pick([
+                "Wig flips, death drops and a splits so deep the whole room gasped.",
+                "Two queens, zero fear: every lyric landed and every move hit.",
+                "It started tense and ended with both queens on their knees, drenched in sweat.",
+                "A reveal, a rip and a high kick that fans will replay for years."]), cls: 'rel', wait: 3400 });
+            if (ls.rel && ['rivals', 'former friends'].includes(ls.rel)) L.push({ html: `The tension was real: ${ls.a} and ${ls.b} were ${ls.rel} going in.`, wait: 3000 });
+            if (ls.double) L.push({ html: "It ended in a double result that nobody saw coming.", wait: 2600 });
+            if (ls.out) L.push({ html: `In the end, <b>${ls.out}</b> sashayed away, and the crowd was in shock.`, cls: 'sashay', wait: 3000 });
+            else if (ls.winner) L.push({ html: `<b>${ls.winner}</b> took the win and a standing ovation.`, cls: 'stay', wait: 3000 });
+        }
+        if (fg) L.push({ html: `🔥 <b>Fight of the Season</b> (Episode ${fg.ep}): ${fg.cause}. <b>${fg.a}</b> and <b>${fg.b}</b> never looked at each other the same way.`, cls: 'bottom', wait: 3800 });
+        if (lp) L.push({ html: `💄 <b>Lipstick Moment of the Season</b> (Episode ${lp.ep}): <b>${lp.w}</b> chose <b>${lp.chosen.join('</b> and <b>')}</b>. \"${lp.reason}\"`, cls: 'rel', wait: 3800 });
+        L.push({ html: "Thank you for watching this season. Until next time: if you can't love yourself, how in the hell are you gonna love somebody else?", wait: 3000 });
+        revealLines(textEl, L, 2800);
+    }
+}
+
+/* ============================================================
+   FINALE
+   ============================================================ */
+function ppeOf(name) {
+    const vals = seasonHistory.map(r => getPlacement(r, name)).filter(x => x).map(x => PTS[x]);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+}
+
+function startFinale() {
+    inFinale = true;
+    currentPhaseIndex = 0;
+    const scored = contestants.map(n => ({ n, s: ppeOf(n) * 0.6 + Math.random() * 3 + (Math.random() < 0.2 ? 1 : 0) }))
+        .sort((a, b) => b.s - a.s);
+    const order = scored.map(x => x.n);
+    const tie = Math.random() < 0.3;
+    if (tie && ppeOf(order[1]) > ppeOf(order[0])) [order[0], order[1]] = [order[1], order[0]];
+    finale = {
+        order,
+        tie,
+        ppe: [ppeOf(order[0]), ppeOf(order[1])],
+        scoreOrder: scored.map(x => x.n),
+        intro: shuf(order),
+        song: pick(lipSyncSongs),
+        talent: pick(["Final Talent Showcase", "Final Dance Number", "Original Music Video"])
+    };
+    if (order.length === 4) {
+        // Top 4: lip sync battles (semifinals), then a final lip sync battle
+        const sc = {};
+        scored.forEach(x => { sc[x.n] = x.s; });
+        const wt = n => Math.max(0.5, sc[n]);
+        const duel = (a, b) => Math.random() < wt(a) / (wt(a) + wt(b)) ? a : b;
+        const sh = shuf(order);
+        const mk = (a, b) => { const w = duel(a, b); return { a, b, winner: w, loser: w === a ? b : a, song: pick(lipSyncSongs) }; };
+        const s1 = mk(sh[0], sh[1]), s2 = mk(sh[2], sh[3]);
+        const fa = s1.winner, fb = s2.winner;
+        const pa = ppeOf(fa), pb = ppeOf(fb);
+        const useTrack = tie && pa !== pb;
+        const champ = useTrack ? (pa > pb ? fa : fb) : duel(fa, fb);
+        const runner = champ === fa ? fb : fa;
+        const losers = [s1.loser, s2.loser].sort((x, y) => sc[y] - sc[x]);
+        finale.order = [champ, runner, ...losers];
+        finale.bracket = { semis: [s1, s2], final: [fa, fb] };
+        finale.tie = useTrack;
+        finale.ppe = [ppeOf(champ), ppeOf(runner)];
+    }
+    if (formatType === 'stars' && contestants.length >= 3) {
+        const seeds = contestants.slice().sort((a, b) => ((starCount[b] || 0) - (starCount[a] || 0)) || (ppeOf(b) - ppeOf(a)));
+        const lad = runLadder(seeds);
+        finale.order = lad.order; finale.ladder = lad.rounds; finale.bracket = null; finale.tie = false;
+        finale.ppe = [ppeOf(lad.order[0]), ppeOf(lad.order[1])];
+        finale.cells = { ...starsCells2, ...ladderCells(lad, true) };
+    }
+    {
+        const fa = finale.bracket ? finale.bracket.final : [finale.order[0], finale.order[1]];
+        const rr = relOf(fa[0], fa[1]);
+        seasonMoments.push({ kind: 'lipsync', ep: 'Finale', a: fa[0], b: fa[1], song: finale.song, winner: finale.order[0], out: null,
+            rel: rr ? rr.type : null, sc: 4 + Math.random() * 3 + (rr && ['rivals', 'former friends'].includes(rr.type) ? 2 : 0) });
+    }
+    document.getElementById('episode-header').innerText = `Grand Finale • Top ${order.length}`;
+    runPhase();
+}
+
+const finalePools = {
+    talent: {
+        strong: ["delivers a show-stopping performance that brings the judges to their feet.", "owns the stage with razor-sharp precision and star power.", "gives a performance full of heart that leaves the room in tears.", "serves charisma, polish and nerve in equal measure."],
+        mid: ["gives a confident performance with a few risky moments that mostly pay off.", "brings the energy, and the crowd goes wild."],
+        weak: ["has a few shaky moments, but fights through to the end with real heart.", "plays it a little safe, but stays composed under pressure."]
+    },
+    runway: {
+        strong: ["serves a jaw-dropping, crown-worthy look that silences the room.", "glides down the runway in a couture moment for the history books."],
+        mid: ["presents a polished look with beautiful details.", "strikes every pose with confidence, though the concept is a little busy."],
+        weak: ["gives a pretty look, but the judges wanted more of a wow moment.", "delivers a safe runway that doesn't quite reach the heights of the others."]
+    }
+};
+function finaleComment(name, kind) {
+    const idx = (finale.scoreOrder || finale.order).indexOf(name);
+    const p = finalePools[kind];
+    const all = p.strong.concat(p.mid, p.weak);
+    if (Math.random() < 0.5) return pick(all);
+    if (idx <= 1) return pick(p.strong.concat(p.mid));
+    return pick(p.mid.concat(p.weak));
+}
+
+/* ============================================================
+   TRACK RECORD DATA
+   ============================================================ */
+const PTS = { "WIN": 5, "TOP 2": 4.5, "HIGH": 4, "SAFE": 3, "LOW": 2, "BTM2": 1, "BTM3": 1, "ELIM": 0 };
+
+function getOrdinalSuffix(n) {
+    const s = ["th", "st", "nd", "rd"], v = n % 100;
+    return s[(v - 20) % 10] || s[v] || s[0];
+}
+
+function getPlacement(rec, name) {
+    if (!rec.activePool.includes(name)) return null;
+    if ((rec.eliminatedAll || [rec.eliminated]).includes(name)) return "ELIM";
+    if (rec.winner === name || rec.coWinner === name) return "WIN";
+    if (rec.topTwo && rec.topTwo.includes(name)) return "TOP 2";
+    if (rec.high.includes(name)) return "HIGH";
+    if (rec.low && rec.low.includes(name)) return "LOW";
+    if (rec.bottom.includes(name)) return "BTM2";
+    if (rec.bottomThree && rec.bottomThree.includes(name)) return "BTM3";
+    return "SAFE";
+}
+
+function slimHistory(h) {
+    return h.map(r => ({
+        episodeNum: r.episodeNum, activePool: r.activePool, miniWinner: r.miniWinner, challenge: r.challenge,
+        winner: r.winner, coWinner: r.coWinner, high: r.high, safe: r.safe, low: r.low, bottom: r.bottom,
+        bottomThree: r.bottomThree, topTwo: r.topTwo, starBlocked: r.starBlocked, starsFmt: r.starsFmt, starAward: r.starAward, starGift: r.starGift, eliminated: r.eliminated, eliminatedAll: r.eliminatedAll
+    }));
+}
+
+function currentState() {
+    return { allCast: [...allCast], seasonHistory: slimHistory(seasonHistory), eliminatedQueens: [...eliminatedQueens], finalists: null, origPlace: { ...pastShort } };
+}
+
+function trackCell(r, pl, i) {
+    if (!pl) return { text: '', cls: 'OUT', mini: false };
+    const base = { text: pl, cls: pl.replace(' ', ''), mini: r.mini[i] };
+    const si = r.sInfo[i];
+    if (!si) return base;
+    if (pl === 'WIN') { base.text = 'WIN'; base.cls = 'WINLS'; }
+    else if (pl === 'TOP 2') { base.text = 'WIN'; base.cls = 'WIN'; }
+    if (si.blocked) {
+        if (pl === 'HIGH') { base.text = 'HIGH + BLOCK'; base.cls = 'HIGHBLOCK'; }
+        else { base.text = 'BLOCK'; base.cls = 'BLOCKRED'; }
+    }
+    if (si.gift) base.note = 'Gifted Star';
+    return base;
+}
+
+function buildTrackData(st, finalMode) {
+    const hist = st.seasonHistory;
+    const rows = st.allCast.map(name => {
+        const places = hist.map(rec => getPlacement(rec, name));
+        const vals = places.filter(x => x).map(x => PTS[x]);
+        const ppe = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+        const el = st.eliminatedQueens.find(e => e.name === name);
+        const sInfo = hist.map(rec => (rec.starsFmt && rec.activePool.includes(name)) ? { blocked: rec.starBlocked === name, gift: !!(rec.starGift && rec.starGift.includes(name)) } : null);
+        const stars = hist.reduce((a, rec) => a + ((rec.starAward || {})[name] || 0), 0);
+        return { name, places, sInfo, stars, orig: (st.origPlace || {})[name] || '', ppe, elimEp: el ? el.episode : null, order: el ? (el.order !== undefined ? el.order : el.episode * 100) : null, mini: hist.map(rec => rec.miniWinner === name && rec.activePool.includes(name)) };
+    });
+
+    let active = rows.filter(r => r.elimEp === null);
+    const out = rows.filter(r => r.elimEp !== null).sort((a, b) => b.order - a.order);
+    const recent = r => r.places.map(x => x === null ? -1 : PTS[x]).reverse();
+
+    if (finalMode && st.finalists) {
+        active.sort((a, b) => st.finalists.indexOf(a.name) - st.finalists.indexOf(b.name));
+    } else {
+        active.sort((a, b) => {
+            if (b.ppe !== a.ppe) return b.ppe - a.ppe;
+            const ra = recent(a), rb = recent(b);
+            for (let i = 0; i < ra.length; i++) if (rb[i] !== ra[i]) return rb[i] - ra[i];
+            return 0;
+        });
+    }
+    const ordered = [...active, ...out];
+    const starsFmt = hist.some(rec => rec.starsFmt);
+
+    return {
+        finalMode, starsFmt,
+        headers: hist.map((rec, i) => ({ ep: i + 1, sub: rec.challenge.name })),
+        rows: ordered.map((r, idx) => {
+            const rank = idx + 1;
+            let note = '';
+            if (finalMode && r.elimEp === null) note = rank === 1 ? '(Winner)' : rank === 2 ? '(Runner-Up)' : '';
+            let finaleCell = null;
+            if (finalMode) {
+                if (st.finaleCells && st.finaleCells[r.name]) finaleCell = st.finaleCells[r.name];
+                else if (r.elimEp !== null) finaleCell = { text: '', cls: 'OUT' };
+                else if (rank === 1) finaleCell = { text: 'WINNER', cls: 'WINNER' };
+                else if (rank === 2) finaleCell = { text: 'RUNNER-UP', cls: 'RUNNER-UP' };
+                else finaleCell = { text: 'FINALIST', cls: 'FINALIST' };
+            }
+            return {
+                rank, note, name: r.name, orig: r.orig, ppe: r.ppe, finale: finaleCell, stars: r.stars,
+                rankText: (finalMode && starsFmt) ? (idx === 0 ? '1st' : idx === 1 ? '2nd' : idx < 4 ? '3rd/4th' : `5th-${ordered.length}${getOrdinalSuffix(ordered.length)}`) : null,
+                cells: r.places.map((pl, i) => trackCell(r, pl, i))
+            };
+        })
+    };
+}
+
+function renderTrackHTML(data, thead, tbody) {
+    let h = `<tr><th>Rank</th><th>Contestant</th>`;
+    data.headers.forEach(c => { h += `<th>Ep. ${c.ep}<br><span style="font-weight:normal;font-size:0.8em;">${c.sub}</span></th>`; });
+    if (data.finalMode) h += `<th>Finale</th>`;
+    h += data.starsFmt ? `<th>PPE - Stars</th></tr>` : `<th>PPE</th></tr>`;
+    thead.innerHTML = h;
+
+    let b = '';
+    data.rows.forEach(r => {
+        b += `<tr><td class="rank-col">${r.rankText || (r.rank + getOrdinalSuffix(r.rank))}${r.note ? `<br><small>${r.note}</small>` : ''}</td>`;
+        b += `<td class="name-col">${r.name}${r.orig ? `<br><small style="font-weight:normal;">${r.orig}</small>` : ''}</td>`;
+        r.cells.forEach(c => {
+            b += `<td class="badge-${c.cls}">${c.text}${c.mini ? '<i class="mc">Mini Chall. Winner</i>' : ''}${c.note ? `<i class="mc">${c.note}</i>` : ''}</td>`;
+        });
+        if (r.finale) b += `<td class="badge-${r.finale.cls}">${r.finale.text}</td>`;
+        b += `<td class="ppe-col">${r.ppe.toFixed(2)}${data.starsFmt ? ' - ' + r.stars : ''}</td></tr>`;
+    });
+    tbody.innerHTML = b;
+}
+
+/* ============================================================
+   RESULTS
+   ============================================================ */
+function seasonState() {
+    return {
+        allCast: [...allCast],
+        seasonHistory: slimHistory(seasonHistory),
+        eliminatedQueens: [...eliminatedQueens],
+        finalists: finale.order || contestants,
+        finaleCells: finale.cells || null,
+        rels: rels.map(r => ({ ...r })),
+        format: formatType,
+        origPlace: { ...pastShort },
+        finaleSize: opts.finaleSize,
+        setId: currentSetId(),
+        setName: currentSetName()
+    };
+}
+
+function showResults() {
+    contestants = [...finale.order];
+    finalState = seasonState();
+    showResultsFromState(finalState, false);
+}
+
+function showResultsFromState(st, saved) {
+    document.getElementById('setup-screen').classList.remove('active');
+    document.getElementById('sim-screen').classList.remove('active');
+    document.getElementById('results-screen').classList.add('active');
+    finalState = st;
+    const w = st.finalists[0], ru = st.finalists[1];
+    document.getElementById('winner-announcement').innerHTML = `👑 WINNER OF THE SEASON: ${w} 👑<br>Runner-Up: ${ru}`;
+    document.getElementById('save-edition-btn').style.display = saved ? 'none' : '';
+    document.getElementById('save-status').innerText = saved ? `Viewing saved edition: ${st.title || ''}` : `Save Edition will add this season to the set: ${st.setName || currentSetName()}`;
+    renderTrackHTML(buildTrackData(st, true), document.getElementById('table-head'), document.getElementById('table-body'));
+}
+
+/* ============================================================
+   SAVE EDITION (localStorage)
+   ============================================================ */
+const EDITION_KEY = 'dragRaceSimEditions';
+const SET_KEY = 'dragRaceSimSets';
+
+function getSets() {
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem(SET_KEY) || '[]'); } catch (e) { list = []; }
+    if (!list.length) { list = [{ id: 'default', name: 'My Show', cast: '' }]; putSets(list); }
+    return list;
+}
+function putSets(list) {
+    try { localStorage.setItem(SET_KEY, JSON.stringify(list)); return true; } catch (e) { return false; }
+}
+function getEditions() {
+    try { return JSON.parse(localStorage.getItem(EDITION_KEY) || '[]'); } catch (e) { return []; }
+}
+function putEditions(list) {
+    try { localStorage.setItem(EDITION_KEY, JSON.stringify(list)); return true; } catch (e) { return false; }
+}
+function currentSetId() {
+    const el = document.getElementById('set-select');
+    return (el && el.value) || 'default';
+}
+function currentSetName() {
+    const set = getSets().find(x => x.id === currentSetId());
+    return set ? set.name : 'My Show';
+}
+function renderSets(selectId) {
+    const sel = document.getElementById('set-select');
+    const keep = selectId || sel.value;
+    sel.innerHTML = '';
+    getSets().forEach(st => {
+        const o = document.createElement('option');
+        o.value = st.id; o.textContent = st.name;
+        sel.appendChild(o);
+    });
+    if (keep && [...sel.options].some(o => o.value === keep)) sel.value = keep;
+}
+function newSet() {
+    const name = prompt("Name of the new show / set (e.g. Drag Race Philippines):");
+    if (!name || !name.trim()) return;
+    const list = getSets();
+    const id = 's' + Date.now();
+    list.push({ id, name: name.trim().replace(/[<>&"]/g, ''), cast: '' });
+    putSets(list);
+    renderSets(id);
+    renderEditions();
+}
+function deleteSet() {
+    const list = getSets();
+    const id = currentSetId();
+    const set = list.find(x => x.id === id);
+    if (!set) return;
+    const count = getEditions().filter(e => (e.setId || 'default') === id).length;
+    if (!confirm(`Delete the set "${set.name}" and its ${count} saved edition(s)?`)) return;
+    putEditions(getEditions().filter(e => (e.setId || 'default') !== id));
+    putSets(list.filter(x => x.id !== id));
+    renderSets();
+    renderEditions();
+}
+function saveCastToSet() {
+    const list = getSets();
+    const set = list.find(x => x.id === currentSetId());
+    if (!set) return;
+    set.cast = document.getElementById('cast-input').value;
+    alert(putSets(list) ? `Cast saved to "${set.name}".` : "Couldn't save. Your browser may be blocking local storage.");
+}
+function loadSetCast() {
+    const set = getSets().find(x => x.id === currentSetId());
+    if (!set || !set.cast) return alert("This set has no saved cast yet. Use \"Save cast to set\" first.");
+    document.getElementById('cast-input').value = set.cast;
+}
+
+function saveEdition() {
+    if (!finalState) return;
+    const list = getEditions();
+    const setId = finalState.setId || currentSetId();
+    const setName = finalState.setName || currentSetName();
+    const inSet = list.filter(e => (e.setId || 'default') === setId).length;
+    const title = prompt(`Name this edition (it will be saved in "${setName}"):`, `Season ${inSet + 1}`);
+    if (title === null) return;
+    const entry = { ...finalState, placements: editionPlacements(finalState), id: Date.now(), title: title.trim().replace(/[<>&"]/g, '') || `Season ${inSet + 1}`, date: new Date().toLocaleString(), setId, setName };
+    list.push(entry);
+    const ok = putEditions(list);
+    document.getElementById('save-status').innerText = ok
+        ? `✔ Saved as "${entry.title}" in the set "${setName}". You can open it from the start screen.`
+        : "Couldn't save. Your browser may be blocking local storage.";
+    renderEditions();
+}
+function exportBackup() {
+    const data = { app: 'drag-race-simulator', version: 1, exported: new Date().toISOString(), sets: getSets(), editions: getEditions() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `drag-race-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    document.getElementById('backup-status').innerText = `✔ Exported ${data.sets.length} show(s) and ${data.editions.length} edition(s).`;
+}
+function mergeBackup(data) {
+    if (!data || !Array.isArray(data.sets) || !Array.isArray(data.editions)) return { ok: false, msg: "That file isn't a valid backup." };
+    const sets = getSets(), eds = getEditions();
+    let addedSets = 0, addedEds = 0;
+    data.sets.forEach(z => { if (z && z.id && !sets.some(x => x.id === z.id)) { sets.push(z); addedSets++; } });
+    const sig = e => `${e.setId || 'default'}|${e.title}|${e.date}|${(e.allCast || []).join(',')}`;
+    const have = new Set(eds.map(sig));
+    data.editions.forEach(e => {
+        if (!e || !e.title || have.has(sig(e))) return;
+        if (eds.some(x => x.id === e.id)) e = { ...e, id: Date.now() + Math.floor(Math.random() * 100000) };
+        eds.push(e); have.add(sig(e)); addedEds++;
+        if (!sets.some(x => x.id === (e.setId || 'default'))) { sets.push({ id: e.setId || 'default', name: e.setName || 'Imported Show', cast: '' }); addedSets++; }
+    });
+    if (!putSets(sets) || !putEditions(eds)) return { ok: false, msg: "Couldn't save. Your browser may be blocking local storage." };
+    return { ok: true, msg: `✔ Imported ${addedEds} edition(s) and ${addedSets} show(s). Existing data was kept.` };
+}
+function importBackup(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        let res;
+        try { res = mergeBackup(JSON.parse(reader.result)); } catch (e) { res = { ok: false, msg: "That file couldn't be read as a backup." }; }
+        document.getElementById('backup-status').innerText = res.msg;
+        if (res.ok) { renderSets(currentSetId()); renderEditions(); }
+        input.value = '';
+    };
+    reader.readAsText(file);
+}
+function moveEdition(edId, targetId, mode) {
+    const list = getEditions();
+    const ed = list.find(e => e.id === edId);
+    const target = getSets().find(x => x.id === targetId);
+    if (!ed || !target) return { ok: false, msg: 'Could not find that season or show.' };
+    if ((ed.setId || 'default') === targetId) return { ok: false, msg: 'That season is already in this show.' };
+    if (mode === 'copy') {
+        list.push({ ...ed, id: Date.now() + Math.floor(Math.random() * 100000), setId: target.id, setName: target.name });
+    } else {
+        ed.setId = target.id; ed.setName = target.name;
+    }
+    if (!putEditions(list)) return { ok: false, msg: "Couldn't save. Your browser may be blocking local storage." };
+    return { ok: true, msg: `✔ ${mode === 'copy' ? 'Copied' : 'Moved'} "${ed.title}" ${mode === 'copy' ? 'to' : 'to'} "${target.name}".` };
+}
+function renderEditions(msg) {
+    const setId = currentSetId();
+    const list = getEditions().filter(e => (e.setId || 'default') === setId);
+    const panel = document.getElementById('editions-panel');
+    const box = document.getElementById('editions-list');
+    document.getElementById('editions-label').innerText = `💾 Saved Editions in "${currentSetName()}"`;
+    panel.style.display = (list.length || msg) ? 'block' : 'none';
+    box.innerHTML = '';
+    if (msg) { const m = document.createElement('div'); m.style.cssText = 'color:var(--text-muted); font-size:0.85rem; margin-bottom:8px;'; m.textContent = msg; box.appendChild(m); }
+    list.slice().reverse().forEach(ed => {
+        const d = document.createElement('div');
+        d.className = 'edition-item';
+        d.innerHTML = `<div class="info"><b>${ed.title}</b><small>${ed.date} • Winner: ${ed.finalists[0]}${ed.finaleSize ? ' • Top ' + ed.finaleSize : ''}</small></div>`;
+        const v = document.createElement('button'); v.className = 'btn btn-secondary'; v.innerText = 'View';
+        v.onclick = () => showResultsFromState(ed, true);
+        const x = document.createElement('button'); x.className = 'btn btn-secondary'; x.innerText = 'Delete';
+        x.onclick = () => { if (confirm(`Delete "${ed.title}"?`)) { putEditions(getEditions().filter(e => e.id !== ed.id)); renderEditions(); } };
+        const mvBtn = document.createElement('button'); mvBtn.className = 'btn btn-secondary'; mvBtn.innerText = 'Move / Copy';
+        d.appendChild(v); d.appendChild(mvBtn); d.appendChild(x);
+        box.appendChild(d);
+        const mp = document.createElement('div');
+        mp.style.cssText = 'display:none; background:#121214; border:1px solid var(--border-color); border-radius:8px; padding:10px 12px; margin:-4px 0 8px;';
+        const others = getSets().filter(z => z.id !== (ed.setId || 'default'));
+        if (!others.length) {
+            mp.textContent = 'Create another show first (use the show selector at the top), then you can move or copy seasons into it.';
+        } else {
+            const sel = document.createElement('select');
+            others.forEach(z => { const o = document.createElement('option'); o.value = z.id; o.textContent = z.name; sel.appendChild(o); });
+            const mkOpt = (val, label, checked) => {
+                const l = document.createElement('label'); l.className = 'chk';
+                const r = document.createElement('input'); r.type = 'radio'; r.name = 'mv-' + ed.id; r.value = val; r.checked = checked;
+                l.appendChild(r); l.appendChild(document.createTextNode(' ' + label)); return { l, r };
+            };
+            const mvO = mkOpt('move', 'Move (remove it from this show)', true), cpO = mkOpt('copy', 'Copy (keep it here too)', false);
+            const go = document.createElement('button'); go.className = 'btn'; go.style.marginTop = '8px'; go.innerText = 'Confirm';
+            go.onclick = () => {
+                const res = moveEdition(ed.id, sel.value, cpO.r.checked ? 'copy' : 'move');
+                renderEditions(res.msg);
+                if (res.ok) renderAllStarsPicker && document.getElementById('as-panel') && document.getElementById('as-panel').open && renderAllStarsPicker();
+            };
+            const lab = document.createElement('div'); lab.style.cssText = 'color:var(--text-muted); font-size:0.85rem; margin-bottom:6px;'; lab.textContent = `Send "${ed.title}" to:`;
+            mp.appendChild(lab); mp.appendChild(sel); mp.appendChild(mvO.l); mp.appendChild(cpO.l); mp.appendChild(go);
+        }
+        box.appendChild(mp);
+        mvBtn.onclick = () => { mp.style.display = mp.style.display === 'none' ? 'block' : 'none'; };
+    });
+}
+
+/* ============================================================
+   SAVE TRACK RECORD AS PNG
+   ============================================================ */
+const CLS_COLOR = { WIN: '#00bfff', TOP2: '#00bfff', HIGH: '#add8e6', SAFE: '#ffffff', LOW: '#ffb6c1', BTM2: '#ff6347', BTM3: '#ff6347', ELIM: '#ff0000', OUT: '#808080', BLOCKED: '#9b30ff', WINLS: '#4169e1', BLOCKRED: '#ff0000', HIGHBLOCK: '#d97070', LOST1: '#ff7f00', L2WIN: '#c5e0b3', L2A: '#a9d08e', L2B: '#8fb673', L2C: '#729a5a', L2E: '#a0522d', WINNER: '#ffff00', 'RUNNER-UP': '#ffd700', FINALIST: '#ffa500' };
+
+function savePNG(final) {
+    const st = final ? finalState : currentState();
+    if (!st) return;
+    const data = buildTrackData(st, final);
+    const sub = final ? `Final results • Winner: ${st.finalists[0]}` : `After Episode ${st.seasonHistory.length}`;
+    drawTrackPNG(data, sub, final ? 'track-record-final.png' : `track-record-ep${st.seasonHistory.length}.png`);
+}
+
+function drawTrackPNG(data, subtitle, filename) {
+    const rankW = 100, nameW = 190, colW = 100, ppeW = 80, titleH = 64, hdrH = 66, rowH = 58;
+    const nCols = data.headers.length + (data.finalMode ? 1 : 0);
+    const W = rankW + nameW + nCols * colW + ppeW;
+    const H = titleH + hdrH + data.rows.length * rowH;
+    const sc = 2;
+    const c = document.createElement('canvas');
+    c.width = W * sc; c.height = H * sc;
+    const g = c.getContext('2d');
+    g.scale(sc, sc);
+    const F = "'Segoe UI', Arial, sans-serif";
+
+    g.fillStyle = '#1a1a1e'; g.fillRect(0, 0, W, H);
+    g.textBaseline = 'middle'; g.textAlign = 'left';
+    g.fillStyle = '#ff007f'; g.font = `bold 24px ${F}`; g.fillText('Drag Race Simulator: Track Record', 16, 22);
+    g.fillStyle = '#a0a0ab'; g.font = `14px ${F}`; g.fillText(subtitle, 16, 46);
+
+    function fit(t, maxW) {
+        if (g.measureText(t).width <= maxW) return t;
+        while (t.length > 1 && g.measureText(t + '…').width > maxW) t = t.slice(0, -1);
+        return t + '…';
+    }
+    function cell(x, y, w, h, bg, lines, color) {
+        g.fillStyle = bg; g.fillRect(x, y, w, h);
+        g.strokeStyle = '#999'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+        g.fillStyle = color; g.textAlign = 'center';
+        const n = lines.length;
+        lines.forEach((ln, i) => {
+            g.font = ln.font;
+            g.fillText(fit(ln.t, w - 8), x + w / 2, y + h / 2 + (i - (n - 1) / 2) * ln.lh);
+        });
+    }
+
+    let x = 0, y = titleH;
+    const HB = '#e9dde9', HC = '#222';
+    cell(x, y, rankW, hdrH, HB, [{ t: 'Rank', font: `bold 14px ${F}`, lh: 16 }], HC); x += rankW;
+    cell(x, y, nameW, hdrH, HB, [{ t: 'Contestant', font: `bold 14px ${F}`, lh: 16 }], HC); x += nameW;
+    data.headers.forEach(h => {
+        cell(x, y, colW, hdrH, HB, [{ t: `Ep. ${h.ep}`, font: `bold 13px ${F}`, lh: 18 }, { t: h.sub, font: `11px ${F}`, lh: 16 }], HC);
+        x += colW;
+    });
+    if (data.finalMode) { cell(x, y, colW, hdrH, HB, [{ t: 'Finale', font: `bold 13px ${F}`, lh: 16 }], HC); x += colW; }
+    cell(x, y, ppeW, hdrH, HB, data.starsFmt ? [{ t: 'PPE -', font: `bold 14px ${F}`, lh: 16 }, { t: 'Stars', font: `bold 14px ${F}`, lh: 16 }] : [{ t: 'PPE', font: `bold 14px ${F}`, lh: 16 }], HC);
+
+    data.rows.forEach((r, i) => {
+        x = 0; y = titleH + hdrH + i * rowH;
+        const rl = [{ t: r.rankText || `${r.rank}${getOrdinalSuffix(r.rank)}`, font: `bold 14px ${F}`, lh: 16 }];
+        if (r.note) rl.push({ t: r.note, font: `11px ${F}`, lh: 15 });
+        cell(x, y, rankW, rowH, '#f5eaf5', rl, '#000'); x += rankW;
+        cell(x, y, nameW, rowH, '#f5eaf5', [{ t: r.name, font: `bold 15px ${F}`, lh: 16 }, ...(r.orig ? [{ t: r.orig, font: `11px ${F}`, lh: 14 }] : [])], '#000'); x += nameW;
+        r.cells.forEach(cl => {
+            const lines = [{ t: cl.text, font: `bold 14px ${F}`, lh: 16 }];
+            if (cl.mini) lines.push({ t: 'Mini Chall. Winner', font: `italic 10px ${F}`, lh: 14 });
+            if (cl.note) lines.push({ t: cl.note, font: `italic 10px ${F}`, lh: 14 });
+            cell(x, y, colW, rowH, CLS_COLOR[cl.cls] || '#fff', lines, (cl.cls === 'OUT' || cl.cls === 'BLOCKED' || cl.cls === 'WINLS') ? '#fff' : '#000');
+            x += colW;
+        });
+        if (r.finale) {
+            cell(x, y, colW, rowH, CLS_COLOR[r.finale.cls], [{ t: r.finale.text, font: `bold 13px ${F}`, lh: 16 }], (r.finale.cls === 'OUT' || r.finale.cls === 'L2E') ? '#fff' : '#000');
+            x += colW;
+        }
+        cell(x, y, ppeW, rowH, '#d3d3d3', [{ t: r.ppe.toFixed(2) + (data.starsFmt ? ' - ' + r.stars : ''), font: `bold 14px ${F}`, lh: 16 }], '#000');
+    });
+
+    c.toBlob(async blob => {
+        // In a published artifact, saving goes through the downloads capability.
+        let dl = null;
+        try { dl = (window.claude && window.claude.use) ? await window.claude.use('downloads') : null; } catch (e) { dl = null; }
+        if (dl) {
+            try { await dl.save({ filename, data: blob }); }
+            catch (e) { if (!e || e.code !== 'declined') alert("Couldn't save the PNG here."); }
+            return;
+        }
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1500);
+    }, 'image/png');
+}
+
+/* ============================================================
+   ALL STARS CAST BUILDER (queens from every saved show, with their placements)
+   ============================================================ */
+let pastInfo = {}, pastShort = {};   // queen name -> "Show • Season • placement" (used on the relationship screen)
+
+function editionPlacements(ed) {
+    if (ed.placements && ed.placements.length) return ed.placements;
+    try {
+        const data = buildTrackData(ed, true);
+        return data.rows.map(r => ({
+            name: r.name, rank: r.rank, note: r.note || '',
+            wins: r.cells.filter(c => c.cls === 'WIN').length,
+            bottoms: r.cells.filter(c => c.cls === 'BTM2' || c.cls === 'BTM3' || c.cls === 'ELIM').length
+        }));
+    } catch (e) {
+        return (ed.finalists || []).map((n, i) => ({ name: n, rank: i + 1, note: '', wins: 0, bottoms: 0 }));
+    }
+}
+function placementLabel(pl) {
+    let t = `${pl.rank}${getOrdinalSuffix(pl.rank)}`;
+    const nt = (pl.note || '').replace(/[()]/g, '').trim();
+    if (nt) t += ` (${nt})`;
+    const bits = [];
+    if (pl.wins) bits.push(`${pl.wins} win${pl.wins > 1 ? 's' : ''}`);
+    if (pl.bottoms) bits.push(`${pl.bottoms} bottom${pl.bottoms > 1 ? 's' : ''}`);
+    return bits.length ? `${t} • ${bits.join(', ')}` : t;
+}
+const AS_FORMATS = ['legacy', 'assassin', 'stars', 'teams', 'bracket'];
+function renderAllStarsPicker() {
+    const box = document.getElementById('as-list');
+    box.innerHTML = '';
+    const editions = getEditions();
+    const asUsed = {};
+    editions.forEach(ed => {
+        const isAS = AS_FORMATS.includes(ed.format) || (ed.origPlace && Object.keys(ed.origPlace).length > 0);
+        if (isAS) (ed.allCast || []).forEach(n => { (asUsed[n] = asUsed[n] || []).push(ed.title || 'All Stars'); });
+    });
+    const curCast = document.getElementById('cast-input').value.split('\n').map(x => x.trim()).filter(Boolean);
+    let any = false;
+    getSets().forEach(set => {
+        const eds = editions.filter(e => (e.setId || 'default') === set.id);
+        const seen = new Set();
+        const sections = [];
+        eds.forEach(ed => {
+            const pls = editionPlacements(ed).slice().sort((a, b) => a.rank - b.rank);
+            pls.forEach(pl => seen.add(pl.name));
+            sections.push({ title: ed.title || 'Season', rows: pls.map(pl => ({ name: pl.name, short: `${ed.title || 'Season'} • ${pl.rank}${getOrdinalSuffix(pl.rank)}`, label: placementLabel(pl), info: `${set.name} • ${ed.title || 'Season'} • ${placementLabel(pl)}` })) });
+        });
+        const extra = (set.cast || '').split('\n').map(x => x.trim()).filter(x => x && !seen.has(x));
+        if (extra.length) sections.push({ title: 'Saved cast (no season played yet)', rows: extra.map(n => ({ name: n, label: 'no placement yet', info: `${set.name} • saved cast` })) });
+        if (!sections.length) return;
+        any = true;
+        const div = document.createElement('div'); div.className = 'as-divider'; div.textContent = set.name;
+        box.appendChild(div);
+        sections.forEach(sec => {
+            const h = document.createElement('div'); h.className = 'as-season'; h.textContent = sec.title;
+            box.appendChild(h);
+            sec.rows.forEach(r => {
+                const row = document.createElement('label'); row.className = 'as-row';
+                const cb = document.createElement('input'); cb.type = 'checkbox';
+                cb.dataset.name = r.name; cb.dataset.info = r.info; cb.dataset.short = r.short || '';
+                const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = r.name;
+                const pl = document.createElement('span'); pl.className = 'pl'; pl.textContent = r.label;
+                row.appendChild(cb); row.appendChild(nm); row.appendChild(pl);
+                if (asUsed[r.name]) {
+                    const u = document.createElement('span'); u.className = 'pl'; u.style.color = '#ffb347';
+                    u.textContent = '⭐ Already in All Stars: ' + [...new Set(asUsed[r.name])].join(', ');
+                    row.appendChild(u);
+                }
+                if (curCast.includes(r.name)) {
+                    const c = document.createElement('span'); c.className = 'pl'; c.style.color = '#4cd964';
+                    c.textContent = '✓ In current cast';
+                    row.appendChild(c);
+                }
+                box.appendChild(row);
+            });
+        });
+    });
+    if (!any) box.innerHTML = '<div style="color:var(--text-muted); margin-top:10px;">No saved shows yet. Finish a season and use "Save Edition", or "Save cast to set", then come back here.</div>';
+}
+function addAllStarsToCast(replace) {
+    const ticked = [...document.querySelectorAll('#as-list input[type=checkbox]:checked')];
+    const st = document.getElementById('as-status');
+    if (!ticked.length) { st.innerText = 'Tick at least one queen first.'; return; }
+    const ta = document.getElementById('cast-input');
+    const cur = replace ? [] : ta.value.split('\n').map(x => x.trim()).filter(Boolean);
+    let added = 0, dupes = 0;
+    if (replace) { pastInfo = {}; pastShort = {}; }
+    ticked.forEach(cb => {
+        const n = cb.dataset.name;
+        if (cur.includes(n)) { dupes++; return; }
+        cur.push(n); added++; pastInfo[n] = cb.dataset.info; if (cb.dataset.short) pastShort[n] = cb.dataset.short;
+    });
+    ta.value = cur.join('\n');
+    st.innerText = `Added ${added} queen(s) to the cast${dupes ? ` (${dupes} skipped: already in the cast or picked from two seasons)` : ''}. Cast size: ${cur.length}.`;
+    renderAllStarsPicker();
+}
+
+renderSets();
+renderEditions();
+</script>
+</body>
+</html>
